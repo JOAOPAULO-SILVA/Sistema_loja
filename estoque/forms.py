@@ -1,92 +1,62 @@
 from django import forms
 
-from .models import Fardo, LoteEstoque, Pacote, Produto
+from .models import LoteEstoque, Produto, UnidadeMedida
 
 
 class ProdutoChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.prod_nome} ({obj.prod_cod_barra})"
+        return f"{obj.nome} ({obj.codigo_barras_unidade})"
 
 
 class ProdutoForm(forms.ModelForm):
     class Meta:
         model = Produto
         fields = [
-            "prod_cod_barra",
-            "prod_tipo",
-            "prod_nome",
-            "prod_valor_compra",
-            "prod_valor_venda",
-            "prod_ativo",
+            "nome",
+            "categoria",
+            "codigo_barras_unidade",
+            "preco_venda_base",
         ]
         labels = {
-            "prod_cod_barra": "Código de barras",
-            "prod_tipo": "Tipo",
-            "prod_nome": "Nome",
-            "prod_valor_compra": "Valor de compra",
-            "prod_valor_venda": "Valor de venda",
-            "prod_ativo": "Ativo",
+            "nome": "Nome",
+            "categoria": "Categoria",
+            "codigo_barras_unidade": "Código de barras da unidade",
+            "preco_venda_base": "Preço de venda base (opcional)",
         }
         widgets = {
-            "prod_cod_barra": forms.TextInput(attrs={"class": "form-control"}),
-            "prod_tipo": forms.TextInput(attrs={"class": "form-control"}),
-            "prod_nome": forms.TextInput(attrs={"class": "form-control"}),
-            "prod_valor_compra": forms.NumberInput(
+            "nome": forms.TextInput(attrs={"class": "form-control"}),
+            "categoria": forms.TextInput(attrs={"class": "form-control"}),
+            "codigo_barras_unidade": forms.TextInput(
+                attrs={"class": "form-control"}
+            ),
+            "preco_venda_base": forms.NumberInput(
                 attrs={"class": "form-control", "step": "0.01", "min": "0"}
             ),
-            "prod_valor_venda": forms.NumberInput(
-                attrs={"class": "form-control", "step": "0.01", "min": "0"}
-            ),
-            "prod_ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
 
-class PacoteForm(forms.ModelForm):
-    pct_quantidade = forms.IntegerField(
+class UnidadeMedidaForm(forms.ModelForm):
+    fator_conversao = forms.IntegerField(
         min_value=1,
-        label="Quantidade por pacote",
+        label="Quantidade contida",
         widget=forms.NumberInput(
             attrs={"class": "form-control", "min": "1", "step": "1"}
         ),
     )
 
     class Meta:
-        model = Pacote
-        fields = [
-            "pct_quantidade",
-            "pct_valor_compra",
-            "pct_valor_venda",
-        ]
+        model = UnidadeMedida
+        fields = ["fator_conversao", "codigo_barras"]
         labels = {
-            "pct_valor_compra": "Valor de compra do pacote",
-            "pct_valor_venda": "Valor de venda do pacote",
+            "codigo_barras": "Código de barras da embalagem (opcional)",
         }
         widgets = {
-            "pct_valor_compra": forms.NumberInput(
-                attrs={"class": "form-control", "step": "0.01", "min": "0"}
-            ),
-            "pct_valor_venda": forms.NumberInput(
-                attrs={"class": "form-control", "step": "0.01", "min": "0"}
-            ),
+            "codigo_barras": forms.TextInput(attrs={"class": "form-control"}),
         }
-
-
-class FardoForm(forms.ModelForm):
-    fardo_quantidade = forms.IntegerField(
-        min_value=1,
-        label="Quantidade por fardo",
-        widget=forms.NumberInput(
-            attrs={"class": "form-control", "min": "1", "step": "1"}
-        ),
-    )
-
-    class Meta:
-        model = Fardo
-        fields = ["fardo_quantidade"]
 
 
 class LoteEstoqueForm(forms.ModelForm):
-    lote_prod = ProdutoChoiceField(
+    produto = ProdutoChoiceField(
         queryset=Produto.objects.all(),
         label="Produto",
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -94,16 +64,25 @@ class LoteEstoqueForm(forms.ModelForm):
 
     class Meta:
         model = LoteEstoque
-        fields = ["lote_prod", "lote_validade", "lote_quantidade"]
+        fields = [
+            "produto",
+            "preco_custo_unitario",
+            "quantidade_inicial",
+            "quantidade_disponivel",
+        ]
         labels = {
-            "lote_validade": "Data de validade",
-            "lote_quantidade": "Quantidade em estoque",
+            "preco_custo_unitario": "Custo por unidade",
+            "quantidade_inicial": "Quantidade inicial em unidades",
+            "quantidade_disponivel": "Quantidade disponível em unidades",
         }
         widgets = {
-            "lote_validade": forms.DateInput(
-                attrs={"class": "form-control", "type": "date"}
+            "preco_custo_unitario": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01", "min": "0"}
             ),
-            "lote_quantidade": forms.NumberInput(
+            "quantidade_inicial": forms.NumberInput(
+                attrs={"class": "form-control", "min": "0", "step": "1"}
+            ),
+            "quantidade_disponivel": forms.NumberInput(
                 attrs={"class": "form-control", "min": "0", "step": "1"}
             ),
         }

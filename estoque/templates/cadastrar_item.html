@@ -6,7 +6,7 @@
 {% block body_content %}
 <div class="page-heading">
     <h1>Cadastrar item</h1>
-    <p class="text-subtitle text-muted">Cadastre o produto e suas formas de embalagem em uma única etapa.</p>
+    <p class="text-subtitle text-muted">Cadastre o produto e os códigos de barras de suas embalagens.</p>
 </div>
 
 {% if messages %}
@@ -21,7 +21,7 @@
 <form method="post">
     {% csrf_token %}
     <fieldset class="mb-4">
-        <legend class="h5">Como este produto será comprado?</legend>
+        <legend class="h5">Quais embalagens este produto terá?</legend>
         <div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Forma de venda">
             <input class="btn-check" type="radio" name="nivel_embalagem" id="venda-unidade"
                    value="unidade" {% if nivel_embalagem == "unidade" %}checked{% endif %} required>
@@ -63,7 +63,7 @@
             <section class="card h-100" data-embalagem-card="fardo">
                 <div class="card-header">
                     <h2 class="card-title mb-0">Fardo</h2>
-                    <small class="text-muted">Um fardo contém a quantidade informada de pacotes.</small>
+                    <small class="text-muted">O fator do fardo será calculado em unidades do produto.</small>
                 </div>
                 <div class="card-body">
                     {{ formFardo.as_p }}
