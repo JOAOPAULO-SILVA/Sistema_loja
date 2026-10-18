@@ -8,11 +8,6 @@ class ProdutoChoiceField(forms.ModelChoiceField):
         return f"{obj.prod_nome} ({obj.prod_cod_barra})"
 
 
-class PacoteChoiceField(forms.ModelChoiceField):
-    def label_from_instance(self, obj):
-        return f"{obj.pct_prod.prod_nome} - pacote #{obj.pct_id} ({obj.pct_quantidade} un.)"
-
-
 class ProdutoForm(forms.ModelForm):
     class Meta:
         model = Produto
@@ -47,11 +42,6 @@ class ProdutoForm(forms.ModelForm):
 
 
 class PacoteForm(forms.ModelForm):
-    pct_prod = ProdutoChoiceField(
-        queryset=Produto.objects.all(),
-        label="Produto",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
     pct_quantidade = forms.IntegerField(
         min_value=1,
         label="Quantidade por pacote",
@@ -62,15 +52,26 @@ class PacoteForm(forms.ModelForm):
 
     class Meta:
         model = Pacote
-        fields = ["pct_prod", "pct_quantidade"]
+        fields = [
+            "pct_quantidade",
+            "pct_valor_compra",
+            "pct_valor_venda",
+        ]
+        labels = {
+            "pct_valor_compra": "Valor de compra do pacote",
+            "pct_valor_venda": "Valor de venda do pacote",
+        }
+        widgets = {
+            "pct_valor_compra": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01", "min": "0"}
+            ),
+            "pct_valor_venda": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01", "min": "0"}
+            ),
+        }
 
 
 class FardoForm(forms.ModelForm):
-    fardo_prod = PacoteChoiceField(
-        queryset=Pacote.objects.select_related("pct_prod"),
-        label="Pacote",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
     fardo_quantidade = forms.IntegerField(
         min_value=1,
         label="Quantidade por fardo",
@@ -81,7 +82,7 @@ class FardoForm(forms.ModelForm):
 
     class Meta:
         model = Fardo
-        fields = ["fardo_prod", "fardo_quantidade"]
+        fields = ["fardo_quantidade"]
 
 
 class LoteEstoqueForm(forms.ModelForm):

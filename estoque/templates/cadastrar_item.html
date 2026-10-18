@@ -1,6 +1,101 @@
 {% extends 'setup/base.html' %}
 {% load static %}
 
-{% block body_content %}
+{% block title %}Cadastrar item{% endblock %}
 
+{% block body_content %}
+<div class="page-heading">
+    <h1>Cadastrar item</h1>
+    <p class="text-subtitle text-muted">Cadastre o produto e suas formas de embalagem em uma única etapa.</p>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-success alert-dismissible show fade" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+    <fieldset class="mb-4">
+        <legend class="h5">Como este produto será comprado?</legend>
+        <div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Forma de venda">
+            <input class="btn-check" type="radio" name="nivel_embalagem" id="venda-unidade"
+                   value="unidade" {% if nivel_embalagem == "unidade" %}checked{% endif %} required>
+            <label class="btn btn-outline-primary" for="venda-unidade">Somente unidade</label>
+
+            <input class="btn-check" type="radio" name="nivel_embalagem" id="venda-pacote"
+                   value="pacote" {% if nivel_embalagem == "pacote" %}checked{% endif %}>
+            <label class="btn btn-outline-primary" for="venda-pacote">Unidade e pacote</label>
+
+            <input class="btn-check" type="radio" name="nivel_embalagem" id="venda-fardo"
+                   value="fardo" {% if nivel_embalagem == "fardo" %}checked{% endif %}>
+            <label class="btn btn-outline-primary" for="venda-fardo">Unidade, pacote e fardo</label>
+        </div>
+    </fieldset>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-4">
+            <section class="card h-100">
+                <div class="card-header">
+                    <h2 class="card-title mb-0">Produto</h2>
+                </div>
+                <div class="card-body">
+                    {{ formProduto.as_p }}
+                </div>
+            </section>
+        </div>
+        <div class="col-12 col-lg-4">
+            <section class="card h-100" data-embalagem-card="pacote">
+                <div class="card-header">
+                    <h2 class="card-title mb-0">Pacote</h2>
+                    <small class="text-muted">Opcional, conforme a forma de venda selecionada.</small>
+                </div>
+                <div class="card-body">
+                    {{ formPacote.as_p }}
+                </div>
+            </section>
+        </div>
+        <div class="col-12 col-lg-4">
+            <section class="card h-100" data-embalagem-card="fardo">
+                <div class="card-header">
+                    <h2 class="card-title mb-0">Fardo</h2>
+                    <small class="text-muted">Um fardo contém a quantidade informada de pacotes.</small>
+                </div>
+                <div class="card-body">
+                    {{ formFardo.as_p }}
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button class="btn btn-primary" type="submit">Cadastrar produto</button>
+    </div>
+</form>
+
+<script>
+    (() => {
+        const atualizarCamposEmbalagem = () => {
+            const nivel = document.querySelector('input[name="nivel_embalagem"]:checked')?.value;
+            document.querySelectorAll("[data-embalagem-card]").forEach((card) => {
+                const habilitado = card.dataset.embalagemCard === "pacote"
+                    ? nivel === "pacote" || nivel === "fardo"
+                    : nivel === "fardo";
+                card.querySelectorAll("input, select, textarea").forEach((campo) => {
+                    campo.disabled = !habilitado;
+                });
+                card.classList.toggle("opacity-50", !habilitado);
+            });
+        };
+
+        document.querySelectorAll('input[name="nivel_embalagem"]').forEach((opcao) => {
+            opcao.addEventListener("change", atualizarCamposEmbalagem);
+        });
+        atualizarCamposEmbalagem();
+    })();
+</script>
 {% endblock %}

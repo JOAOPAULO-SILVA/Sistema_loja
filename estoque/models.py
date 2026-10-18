@@ -21,6 +21,8 @@ class Pacote(models.Model):
     pct_quantidade = models.PositiveIntegerField(
         validators=[MinValueValidator(1)]
     )
+    pct_valor_compra = models.DecimalField(max_digits=10, decimal_places=2)
+    pct_valor_venda = models.DecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
         verbose_name = "Pacote"
