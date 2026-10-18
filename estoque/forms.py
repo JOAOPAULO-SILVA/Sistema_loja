@@ -1,4 +1,5 @@
 from django import forms
+from django.forms import formset_factory
 
 from .models import LoteEstoque, Produto, UnidadeMedida
 
@@ -36,9 +37,14 @@ class ProdutoForm(forms.ModelForm):
 
 
 class UnidadeMedidaForm(forms.ModelForm):
+    tipo = forms.CharField(
+        max_length=20,
+        label="Nome da embalagem",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
     fator_conversao = forms.IntegerField(
         min_value=1,
-        label="Quantidade contida",
+        label="Quantidade de unidades do produto",
         widget=forms.NumberInput(
             attrs={"class": "form-control", "min": "1", "step": "1"}
         ),
@@ -46,13 +52,20 @@ class UnidadeMedidaForm(forms.ModelForm):
 
     class Meta:
         model = UnidadeMedida
-        fields = ["fator_conversao", "codigo_barras"]
+        fields = ["tipo", "fator_conversao", "codigo_barras"]
         labels = {
             "codigo_barras": "Código de barras da embalagem (opcional)",
         }
         widgets = {
             "codigo_barras": forms.TextInput(attrs={"class": "form-control"}),
         }
+
+
+UnidadeMedidaFormSet = formset_factory(
+    UnidadeMedidaForm,
+    extra=0,
+    can_delete=True,
+)
 
 
 class LoteEstoqueForm(forms.ModelForm):

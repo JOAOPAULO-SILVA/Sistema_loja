@@ -20,26 +20,9 @@
 
 <form method="post">
     {% csrf_token %}
-    <fieldset class="mb-4">
-        <legend class="h5">Quais embalagens este produto terá?</legend>
-        <div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Forma de venda">
-            <input class="btn-check" type="radio" name="nivel_embalagem" id="venda-unidade"
-                   value="unidade" {% if nivel_embalagem == "unidade" %}checked{% endif %} required>
-            <label class="btn btn-outline-primary" for="venda-unidade">Somente unidade</label>
-
-            <input class="btn-check" type="radio" name="nivel_embalagem" id="venda-pacote"
-                   value="pacote" {% if nivel_embalagem == "pacote" %}checked{% endif %}>
-            <label class="btn btn-outline-primary" for="venda-pacote">Unidade e pacote</label>
-
-            <input class="btn-check" type="radio" name="nivel_embalagem" id="venda-fardo"
-                   value="fardo" {% if nivel_embalagem == "fardo" %}checked{% endif %}>
-            <label class="btn btn-outline-primary" for="venda-fardo">Unidade, pacote e fardo</label>
-        </div>
-    </fieldset>
-
     <div class="row g-4">
-        <div class="col-12 col-lg-4">
-            <section class="card h-100">
+        <div class="col-12">
+            <section class="card">
                 <div class="card-header">
                     <h2 class="card-title mb-0">Produto</h2>
                 </div>
@@ -48,25 +31,53 @@
                 </div>
             </section>
         </div>
-        <div class="col-12 col-lg-4">
-            <section class="card h-100" data-embalagem-card="pacote">
+        <div class="col-12">
+            <section class="card">
                 <div class="card-header">
-                    <h2 class="card-title mb-0">Pacote</h2>
-                    <small class="text-muted">Opcional, conforme a forma de venda selecionada.</small>
+                    <h2 class="card-title mb-0">Embalagens</h2>
+                    <small class="text-muted">Opcional. Informe a quantidade total de unidades do produto em cada embalagem.</small>
                 </div>
                 <div class="card-body">
-                    {{ formPacote.as_p }}
-                </div>
-            </section>
-        </div>
-        <div class="col-12 col-lg-4">
-            <section class="card h-100" data-embalagem-card="fardo">
-                <div class="card-header">
-                    <h2 class="card-title mb-0">Fardo</h2>
-                    <small class="text-muted">O fator do fardo será calculado em unidades do produto.</small>
-                </div>
-                <div class="card-body">
-                    {{ formFardo.as_p }}
+                    {{ formEmbalagens.management_form }}
+                    {% if formEmbalagens.non_form_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ formEmbalagens.non_form_errors }}
+                        </div>
+                    {% endif %}
+                    <div id="embalagens-lista">
+                        {% for embalagem in formEmbalagens %}
+                            <div class="row g-3 align-items-end mb-3" data-embalagem-row>
+                                {% for hidden in embalagem.hidden_fields %}{{ hidden }}{% endfor %}
+                                {% if embalagem.non_field_errors %}
+                                    <div class="col-12 text-danger">{{ embalagem.non_field_errors }}</div>
+                                {% endif %}
+                                <div class="col-12 col-md-3">
+                                    {{ embalagem.tipo.label_tag }}
+                                    {{ embalagem.tipo }}
+                                    {{ embalagem.tipo.errors }}
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    {{ embalagem.fator_conversao.label_tag }}
+                                    {{ embalagem.fator_conversao }}
+                                    {{ embalagem.fator_conversao.errors }}
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    {{ embalagem.codigo_barras.label_tag }}
+                                    {{ embalagem.codigo_barras }}
+                                    {{ embalagem.codigo_barras.errors }}
+                                </div>
+                                <div class="col-12 col-md-2">
+                                    {{ embalagem.DELETE.as_hidden }}
+                                    <button class="btn btn-outline-danger" type="button" data-remover-embalagem>
+                                        Remover
+                                    </button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button class="btn btn-outline-primary" type="button" id="adicionar-embalagem">
+                        Cadastrar embalagem
+                    </button>
                 </div>
             </section>
         </div>
@@ -77,25 +88,64 @@
     </div>
 </form>
 
+<template id="modelo-embalagem">
+    <div class="row g-3 align-items-end mb-3" data-embalagem-row>
+        {% with embalagem=formEmbalagens.empty_form %}
+            {% for hidden in embalagem.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="col-12 col-md-3">
+                {{ embalagem.tipo.label_tag }}
+                {{ embalagem.tipo }}
+                {{ embalagem.tipo.errors }}
+            </div>
+            <div class="col-12 col-md-3">
+                {{ embalagem.fator_conversao.label_tag }}
+                {{ embalagem.fator_conversao }}
+                {{ embalagem.fator_conversao.errors }}
+            </div>
+            <div class="col-12 col-md-4">
+                {{ embalagem.codigo_barras.label_tag }}
+                {{ embalagem.codigo_barras }}
+                {{ embalagem.codigo_barras.errors }}
+            </div>
+            <div class="col-12 col-md-2">
+                {{ embalagem.DELETE.as_hidden }}
+                <button class="btn btn-outline-danger" type="button" data-remover-embalagem>
+                    Remover
+                </button>
+            </div>
+        {% endwith %}
+    </div>
+</template>
+
 <script>
     (() => {
-        const atualizarCamposEmbalagem = () => {
-            const nivel = document.querySelector('input[name="nivel_embalagem"]:checked')?.value;
-            document.querySelectorAll("[data-embalagem-card]").forEach((card) => {
-                const habilitado = card.dataset.embalagemCard === "pacote"
-                    ? nivel === "pacote" || nivel === "fardo"
-                    : nivel === "fardo";
-                card.querySelectorAll("input, select, textarea").forEach((campo) => {
-                    campo.disabled = !habilitado;
-                });
-                card.classList.toggle("opacity-50", !habilitado);
-            });
-        };
+        const lista = document.getElementById("embalagens-lista");
+        const modelo = document.getElementById("modelo-embalagem");
+        const totalForms = document.querySelector('input[name="embalagens-TOTAL_FORMS"]');
 
-        document.querySelectorAll('input[name="nivel_embalagem"]').forEach((opcao) => {
-            opcao.addEventListener("change", atualizarCamposEmbalagem);
+        document.getElementById("adicionar-embalagem").addEventListener("click", () => {
+            const novaEmbalagem = modelo.content.firstElementChild.cloneNode(true);
+            novaEmbalagem.innerHTML = novaEmbalagem.innerHTML.replace(
+                /__prefix__/g,
+                totalForms.value
+            );
+            lista.appendChild(novaEmbalagem);
+            totalForms.value = Number(totalForms.value) + 1;
         });
-        atualizarCamposEmbalagem();
+
+        lista.addEventListener("click", (event) => {
+            const botao = event.target.closest("[data-remover-embalagem]");
+            if (!botao) {
+                return;
+            }
+            const linha = botao.closest("[data-embalagem-row]");
+            linha.querySelector('input[name$="-DELETE"]').value = "on";
+            linha.hidden = true;
+        });
+
+        lista.querySelectorAll('input[name$="-DELETE"][value="on"]').forEach((campo) => {
+            campo.closest("[data-embalagem-row]").hidden = true;
+        });
     })();
 </script>
 {% endblock %}
