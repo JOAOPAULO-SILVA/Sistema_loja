@@ -1,0 +1,30 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar</title>
+    <link rel="stylesheet" href="{% static 'setup/app.css' %}">
+</head>
+<body class="flex min-h-screen items-center justify-center bg-base-200 p-4">
+    <main class="card w-full max-w-sm bg-base-100 shadow-md">
+        <form method="post" class="card-body">
+            {% csrf_token %}
+            <h1 class="card-title mb-2 text-2xl text-primary">Meu Estoque</h1>
+            {% if form.non_field_errors %}
+                <div class="alert alert-error mb-2" role="alert">Usuário ou senha incorretos.</div>
+            {% endif %}
+            <input type="hidden" name="next" value="{{ next }}">
+            <div class="mb-3">
+                <label class="label mb-1 block text-sm font-medium" for="id_username">Usuário</label>
+                <input class="input w-full" id="id_username" name="username" autocomplete="username" autofocus required>
+            </div>
+            <div class="mb-4">
+                <label class="label mb-1 block text-sm font-medium" for="id_password">Senha</label>
+                <input class="input w-full" id="id_password" name="password" type="password" autocomplete="current-password" required>
+            </div>
+            <button class="btn btn-primary w-full" type="submit">Entrar</button>
+        </form>
+    </main>
+</body>
+</html>

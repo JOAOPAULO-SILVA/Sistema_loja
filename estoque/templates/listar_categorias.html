@@ -1,0 +1,45 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Categorias{% endblock %}
+
+{% block body_content %}
+<h1 class="mb-5 text-2xl font-bold">Categorias</h1>
+
+<div class="grid items-start gap-5 md:grid-cols-[20rem_1fr]">
+    <form method="post" class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            {% csrf_token %}
+            <h2 class="card-title mb-2">Nova categoria</h2>
+            {% for erro in form.non_field_errors %}
+                <div class="alert alert-error mb-2" role="alert">{{ erro }}</div>
+            {% endfor %}
+            {% include 'setup/campo.html' with campo=form.nome %}
+            <button class="btn btn-primary" type="submit">Adicionar</button>
+        </div>
+    </form>
+
+    {% if categorias %}
+        <ul class="list rounded-box bg-base-100 shadow-sm">
+            {% for categoria in categorias %}
+                <li class="list-row items-center">
+                    <div class="list-col-grow">
+                        <p class="font-semibold">{{ categoria.nome }}</p>
+                        <p class="text-sm opacity-70">{{ categoria.total_produtos }} produto{{ categoria.total_produtos|pluralize }}</p>
+                    </div>
+                    <a class="btn btn-sm" href="{% url 'estoque:editar_categoria' categoria.pk %}">Editar</a>
+                    {% if not categoria.total_produtos %}
+                        <form method="post" action="{% url 'estoque:excluir_categoria' categoria.pk %}">
+                            {% csrf_token %}
+                            <button class="btn btn-ghost btn-sm" type="submit">Excluir</button>
+                        </form>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="rounded-box bg-base-100 p-8 text-center shadow-sm">
+            <p class="opacity-70">Nenhuma categoria cadastrada.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

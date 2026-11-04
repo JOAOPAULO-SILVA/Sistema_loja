@@ -1,0 +1,13 @@
+{
+  "name": "sistema-loja",
+  "private": true,
+  "scripts": {
+    "css": "tailwindcss -i setup/assets/app.css -o setup/static/setup/app.css --minify",
+    "css:watch": "tailwindcss -i setup/assets/app.css -o setup/static/setup/app.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.4",
+    "daisyui": "^5.7.50",
+    "tailwindcss": "^4.3.4"
+  }
+}

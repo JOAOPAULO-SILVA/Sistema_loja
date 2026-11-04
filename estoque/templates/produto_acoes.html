@@ -1,0 +1,7 @@
+<div class="flex justify-end gap-2">
+    <a class="btn btn-sm" href="{% url 'estoque:editar_produto' produto.pk %}">Editar</a>
+    <form method="post" action="{% url 'estoque:alterar_status_produto' produto.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-ghost btn-sm" type="submit">{% if produto.ativo %}Desativar{% else %}Reativar{% endif %}</button>
+    </form>
+</div>

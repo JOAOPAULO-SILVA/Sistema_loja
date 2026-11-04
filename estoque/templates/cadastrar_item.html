@@ -1,120 +1,66 @@
 {% extends 'setup/base.html' %}
-{% load static %}
 
-{% block title %}Cadastrar item{% endblock %}
+{% block title %}{% if produto %}Editar produto{% else %}Cadastrar item{% endif %}{% endblock %}
 
 {% block body_content %}
-<div class="page-heading">
-    <h1>Cadastrar item</h1>
-    <p class="text-subtitle text-muted">Cadastre o produto e os códigos de barras de suas embalagens.</p>
+<div class="mb-5">
+    <h1 class="text-2xl font-bold">{% if produto %}Editar {{ produto.nome }}{% else %}Cadastrar item{% endif %}</h1>
+    <p class="text-sm opacity-70">Informe os dados do produto e as embalagens em que ele é comprado.</p>
 </div>
 
-{% if messages %}
-    {% for message in messages %}
-        <div class="alert alert-success alert-dismissible show fade" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
-        </div>
-    {% endfor %}
-{% endif %}
-
-<form method="post">
+<form method="post" class="grid gap-5">
     {% csrf_token %}
-    <div class="row g-4">
-        <div class="col-12">
-            <section class="card">
-                <div class="card-header">
-                    <h2 class="card-title mb-0">Produto</h2>
-                </div>
-                <div class="card-body">
-                    {{ formProduto.as_p }}
-                </div>
-            </section>
-        </div>
-        <div class="col-12">
-            <section class="card">
-                <div class="card-header">
-                    <h2 class="card-title mb-0">Embalagens</h2>
-                    <small class="text-muted">Opcional. Informe a quantidade total de unidades do produto em cada embalagem.</small>
-                </div>
-                <div class="card-body">
-                    {{ formEmbalagens.management_form }}
-                    {% if formEmbalagens.non_form_errors %}
-                        <div class="alert alert-danger" role="alert">
-                            {{ formEmbalagens.non_form_errors }}
-                        </div>
-                    {% endif %}
-                    <div id="embalagens-lista">
-                        {% for embalagem in formEmbalagens %}
-                            <div class="row g-3 align-items-end mb-3" data-embalagem-row>
-                                {% for hidden in embalagem.hidden_fields %}{{ hidden }}{% endfor %}
-                                {% if embalagem.non_field_errors %}
-                                    <div class="col-12 text-danger">{{ embalagem.non_field_errors }}</div>
-                                {% endif %}
-                                <div class="col-12 col-md-3">
-                                    {{ embalagem.tipo.label_tag }}
-                                    {{ embalagem.tipo }}
-                                    {{ embalagem.tipo.errors }}
-                                </div>
-                                <div class="col-12 col-md-3">
-                                    {{ embalagem.fator_conversao.label_tag }}
-                                    {{ embalagem.fator_conversao }}
-                                    {{ embalagem.fator_conversao.errors }}
-                                </div>
-                                <div class="col-12 col-md-4">
-                                    {{ embalagem.codigo_barras.label_tag }}
-                                    {{ embalagem.codigo_barras }}
-                                    {{ embalagem.codigo_barras.errors }}
-                                </div>
-                                <div class="col-12 col-md-2">
-                                    {{ embalagem.DELETE.as_hidden }}
-                                    <button class="btn btn-outline-danger" type="button" data-remover-embalagem>
-                                        Remover
-                                    </button>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                    <button class="btn btn-outline-primary" type="button" id="adicionar-embalagem">
-                        Cadastrar embalagem
-                    </button>
-                </div>
-            </section>
-        </div>
-    </div>
+    {% for erro in formProduto.non_field_errors %}
+        <div class="alert alert-error" role="alert">{{ erro }}</div>
+    {% endfor %}
 
-    <div class="mt-4">
-        <button class="btn btn-primary" type="submit">Cadastrar produto</button>
+    <section class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h2 class="card-title mb-2">Produto</h2>
+            <div class="grid gap-x-4 md:grid-cols-2">
+                {% include 'setup/campo.html' with campo=formProduto.nome %}
+                <div>
+                    {% include 'setup/campo.html' with campo=formProduto.categoria %}
+                    {% if not formProduto.categoria.field.queryset.exists %}
+                        <p class="-mt-2 mb-4 text-sm">
+                            Nenhuma categoria cadastrada.
+                            <a class="link link-primary" href="{% url 'estoque:listar_categorias' %}">Criar categoria</a>
+                        </p>
+                    {% endif %}
+                </div>
+                {% include 'setup/campo.html' with campo=formProduto.codigo_barras_unidade %}
+                {% include 'setup/campo.html' with campo=formProduto.preco_venda_base %}
+            </div>
+        </div>
+    </section>
+
+    <section class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h2 class="card-title">Embalagens</h2>
+            <p class="mb-3 text-sm opacity-70">Opcional. Informe quantas unidades do produto vêm em cada embalagem.</p>
+            {{ formEmbalagens.management_form }}
+            {% for erro in formEmbalagens.non_form_errors %}
+                <div class="alert alert-error mb-3" role="alert">{{ erro }}</div>
+            {% endfor %}
+            <div id="embalagens-lista">
+                {% for embalagem in formEmbalagens %}
+                    {% include 'embalagem_linha.html' %}
+                {% endfor %}
+            </div>
+            <div>
+                <button class="btn btn-outline btn-primary" type="button" id="adicionar-embalagem">Cadastrar embalagem</button>
+            </div>
+        </div>
+    </section>
+
+    <div class="flex flex-wrap gap-3">
+        <button class="btn btn-primary" type="submit">{% if produto %}Salvar alterações{% else %}Cadastrar produto{% endif %}</button>
+        <a class="btn btn-ghost" href="{% url 'estoque:listar_produtos' %}">Voltar</a>
     </div>
 </form>
 
 <template id="modelo-embalagem">
-    <div class="row g-3 align-items-end mb-3" data-embalagem-row>
-        {% with embalagem=formEmbalagens.empty_form %}
-            {% for hidden in embalagem.hidden_fields %}{{ hidden }}{% endfor %}
-            <div class="col-12 col-md-3">
-                {{ embalagem.tipo.label_tag }}
-                {{ embalagem.tipo }}
-                {{ embalagem.tipo.errors }}
-            </div>
-            <div class="col-12 col-md-3">
-                {{ embalagem.fator_conversao.label_tag }}
-                {{ embalagem.fator_conversao }}
-                {{ embalagem.fator_conversao.errors }}
-            </div>
-            <div class="col-12 col-md-4">
-                {{ embalagem.codigo_barras.label_tag }}
-                {{ embalagem.codigo_barras }}
-                {{ embalagem.codigo_barras.errors }}
-            </div>
-            <div class="col-12 col-md-2">
-                {{ embalagem.DELETE.as_hidden }}
-                <button class="btn btn-outline-danger" type="button" data-remover-embalagem>
-                    Remover
-                </button>
-            </div>
-        {% endwith %}
-    </div>
+    {% include 'embalagem_linha.html' with embalagem=formEmbalagens.empty_form %}
 </template>
 
 <script>

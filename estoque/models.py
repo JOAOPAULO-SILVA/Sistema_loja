@@ -1,23 +1,48 @@
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
+
+
+class Categoria(models.Model):
+    nome = models.CharField(max_length=100)
+
+    class Meta:
+        verbose_name = "Categoria"
+        verbose_name_plural = "Categorias"
+        ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("nome"),
+                name="categoria_nome_unico",
+                violation_error_message="Já existe uma categoria com esse nome.",
+            ),
+        ]
+
+    def __str__(self):
+        return self.nome
 
 
 class Produto(models.Model):
     nome = models.CharField(max_length=100)
-    categoria = models.CharField(max_length=100)
-    codigo_barras_unidade = models.CharField(max_length=50, unique=True)
+    categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT)
+    codigo_barras_unidade = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+    )
     preco_venda_base = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        null=True,
-        blank=True,
         validators=[MinValueValidator(0)],
     )
+    ativo = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Produto"
         verbose_name_plural = "Produtos"
+        ordering = ["nome"]
 
     def __str__(self):
         return self.nome

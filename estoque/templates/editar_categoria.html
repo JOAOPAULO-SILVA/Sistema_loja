@@ -1,0 +1,21 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Editar categoria{% endblock %}
+
+{% block body_content %}
+<h1 class="mb-5 text-2xl font-bold">Editar categoria</h1>
+
+<form method="post" class="card max-w-md bg-base-100 shadow-sm">
+    <div class="card-body">
+        {% csrf_token %}
+        {% for erro in form.non_field_errors %}
+            <div class="alert alert-error mb-2" role="alert">{{ erro }}</div>
+        {% endfor %}
+        {% include 'setup/campo.html' with campo=form.nome %}
+        <div class="flex gap-3">
+            <button class="btn btn-primary" type="submit">Salvar</button>
+            <a class="btn btn-ghost" href="{% url 'estoque:listar_categorias' %}">Voltar</a>
+        </div>
+    </div>
+</form>
+{% endblock %}

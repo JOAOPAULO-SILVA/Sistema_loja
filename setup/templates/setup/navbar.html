@@ -1,29 +1,18 @@
-<div class="header-top">
-    <div class="container">
-        <div class="logo">
-            <a href="{% url 'estoque:cadastrar_produto' %}" aria-label="Meu Estoque - início">
-                <span class="text-primary fw-bold fs-4">Meu Estoque</span>
-            </a>
-        </div>
-        <div class="header-top-right">
-            <span class="text-muted me-3">
-                <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
-                {{ user.username|default:"Usuário" }}
-            </span>
-            <a href="#" class="burger-btn d-block d-xl-none" aria-label="Abrir menu">
-                <i class="bi bi-list fs-3" aria-hidden="true"></i>
-            </a>
-        </div>
+{% with rota=request.resolver_match.url_name %}
+<header class="navbar bg-base-100 shadow-sm">
+    <div class="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-2">
+        <a href="{% url 'estoque:listar_produtos' %}" class="btn btn-ghost text-lg font-bold text-primary">Meu Estoque</a>
+        <nav aria-label="Navegação principal" class="order-last w-full sm:order-none sm:w-auto sm:flex-1">
+            <ul class="menu menu-horizontal gap-1 p-0">
+                <li><a href="{% url 'estoque:listar_produtos' %}"{% if rota == 'listar_produtos' %} class="menu-active" aria-current="page"{% endif %}>Produtos</a></li>
+                <li><a href="{% url 'estoque:listar_categorias' %}"{% if rota == 'listar_categorias' %} class="menu-active" aria-current="page"{% endif %}>Categorias</a></li>
+            </ul>
+        </nav>
+        <form method="post" action="{% url 'logout' %}" class="ml-auto flex items-center gap-2">
+            {% csrf_token %}
+            <span class="text-sm opacity-70">{{ user.username }}</span>
+            <button class="btn btn-ghost btn-sm" type="submit">Sair</button>
+        </form>
     </div>
-</div>
-<nav class="main-navbar" aria-label="Navegação principal">
-    <div class="container">
-        <ul>
-            <li class="menu-item{% if request.resolver_match.url_name == 'cadastrar_produto' %} active{% endif %}">
-                <a href="{% url 'estoque:cadastrar_produto' %}" class="menu-link">
-                    <span><i class="bi bi-box-seam-fill" aria-hidden="true"></i> Cadastrar item</span>
-                </a>
-            </li>
-        </ul>
-    </div>
-</nav>
+</header>
+{% endwith %}
