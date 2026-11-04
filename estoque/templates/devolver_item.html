@@ -1,0 +1,32 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Registrar devolução{% endblock %}
+
+{% block body_content %}
+<div class="mb-5">
+    <h1 class="text-2xl font-bold">Registrar devolução</h1>
+    <p class="text-sm opacity-70">{{ item.produto.nome }} · até {{ item.quantidade_restante }} unidade{{ item.quantidade_restante|pluralize }}. O valor é calculado pelo que foi cobrado.</p>
+</div>
+
+<form method="post" class="card max-w-xl bg-base-100 shadow-sm">
+    <div class="card-body">
+        {% csrf_token %}
+        {% for erro in form.non_field_errors %}
+            <div class="alert alert-error mb-2" role="alert">{{ erro }}</div>
+        {% endfor %}
+        {% include 'setup/campo.html' with campo=form.quantidade %}
+        <div class="mb-4">
+            <label class="flex items-center gap-2 text-sm font-medium">
+                {{ form.voltar_ao_estoque }}
+                {{ form.voltar_ao_estoque.label }}
+            </label>
+            <p class="mt-1 text-sm opacity-70">{{ form.voltar_ao_estoque.help_text }}</p>
+        </div>
+        {% include 'setup/campo.html' with campo=form.motivo %}
+        <div class="flex flex-wrap gap-3">
+            <button class="btn btn-primary" type="submit">Registrar devolução</button>
+            <a class="btn btn-ghost" href="{% url 'estoque:detalhe_venda' item.venda_id %}">Voltar</a>
+        </div>
+    </div>
+</form>
+{% endblock %}

@@ -3,7 +3,8 @@
     <div class="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-2">
         <a href="{% url 'estoque:listar_produtos' %}" class="btn btn-ghost text-lg font-bold text-primary">Meu Estoque</a>
         <nav aria-label="Navegação principal" class="order-last w-full sm:order-none sm:w-auto sm:flex-1">
-            <ul class="menu menu-horizontal gap-1 p-0">
+            <ul class="menu menu-horizontal flex-wrap gap-1 p-0">
+                <li><a href="{% url 'estoque:listar_vendas' %}"{% if rota == 'listar_vendas' or rota == 'nova_venda' or rota == 'detalhe_venda' %} class="menu-active" aria-current="page"{% endif %}>Vendas</a></li>
                 <li><a href="{% url 'estoque:listar_produtos' %}"{% if rota == 'listar_produtos' %} class="menu-active" aria-current="page"{% endif %}>Produtos</a></li>
                 <li><a href="{% url 'estoque:listar_categorias' %}"{% if rota == 'listar_categorias' %} class="menu-active" aria-current="page"{% endif %}>Categorias</a></li>
                 <li><a href="{% url 'estoque:listar_movimentacoes' %}"{% if rota == 'listar_movimentacoes' %} class="menu-active" aria-current="page"{% endif %}>Movimentações</a></li>

@@ -18,7 +18,7 @@
                     {% endif %}
                     <td>{{ movimentacao.get_tipo_display }}</td>
                     <td class="text-right font-semibold {% if movimentacao.quantidade > 0 %}text-success{% else %}text-error{% endif %}">{% if movimentacao.quantidade > 0 %}+{% endif %}{{ movimentacao.quantidade }}</td>
-                    <td class="text-sm opacity-70">{{ movimentacao.get_motivo_display }}{% if movimentacao.motivo and movimentacao.observacao %} · {% endif %}{{ movimentacao.observacao }}</td>
+                    <td class="text-sm opacity-70">{% if movimentacao.venda_id %}<a class="link" href="{% url 'estoque:detalhe_venda' movimentacao.venda_id %}">Venda {{ movimentacao.venda_id }}</a>{% endif %}{{ movimentacao.get_motivo_display }}{% if movimentacao.motivo and movimentacao.observacao %} · {% endif %}{{ movimentacao.observacao }}</td>
                 </tr>
             {% empty %}
                 <tr>

@@ -1,0 +1,56 @@
+{% extends 'setup/base.html' %}
+{% load static %}
+
+{% block title %}Nova venda{% endblock %}
+
+{% block body_content %}
+<h1 class="mb-5 text-2xl font-bold">Nova venda</h1>
+
+{% for erro in form.non_field_errors %}
+    <div class="alert alert-error mb-4" role="alert">{{ erro }}</div>
+{% endfor %}
+{% for erro in form.itens.errors %}
+    <div class="alert alert-error mb-4" role="alert">{{ erro }}</div>
+{% endfor %}
+
+<form method="post" id="form-venda" data-url-busca="{% url 'estoque:buscar_produtos' %}" class="grid items-start gap-5 lg:grid-cols-[1fr_20rem]">
+    {% csrf_token %}
+    {{ form.itens }}
+
+    <div class="grid gap-5">
+        <section class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <label class="label mb-1 block text-sm font-medium" for="busca-produto">Buscar por nome ou código de barras</label>
+                <input class="input w-full" id="busca-produto" type="search" autocomplete="off" autofocus>
+                <p class="mt-2 hidden text-sm text-error" id="busca-aviso" role="status"></p>
+                <ul class="mt-2 grid gap-2 empty:hidden" id="busca-resultados"></ul>
+            </div>
+        </section>
+
+        <section class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title mb-2">Itens</h2>
+                <p class="py-6 text-center opacity-70" id="carrinho-vazio">Nenhum produto adicionado.</p>
+                <ul class="grid gap-3" id="carrinho"></ul>
+            </div>
+        </section>
+    </div>
+
+    <section class="card bg-base-100 shadow-sm lg:sticky lg:top-4">
+        <div class="card-body">
+            <h2 class="card-title mb-2">Pagamento</h2>
+            {% include 'setup/campo.html' with campo=form.desconto %}
+            {% include 'setup/campo.html' with campo=form.forma_pagamento %}
+            <dl class="mb-4 grid grid-cols-[1fr_auto] gap-1">
+                <dt class="opacity-70">Subtotal</dt>
+                <dd id="resumo-subtotal">R$ 0,00</dd>
+                <dt class="text-lg font-bold">Total</dt>
+                <dd class="text-lg font-bold" id="resumo-total">R$ 0,00</dd>
+            </dl>
+            <button class="btn btn-primary w-full" type="submit">Finalizar venda</button>
+        </div>
+    </section>
+</form>
+
+<script src="{% static 'estoque/venda.js' %}"></script>
+{% endblock %}

@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -7,7 +8,16 @@ from django.urls import reverse
 
 from . import services
 from .forms import CategoriaForm
-from .models import Categoria, LoteEstoque, MovimentacaoEstoque, Produto, UnidadeMedida
+from .models import (
+    Categoria,
+    Devolucao,
+    ItemVenda,
+    LoteEstoque,
+    MovimentacaoEstoque,
+    Produto,
+    UnidadeMedida,
+    Venda,
+)
 
 
 class UsuarioLogadoTestCase(TestCase):
@@ -523,6 +533,337 @@ class TelasEstoqueTests(EstoqueTestCase):
         )
 
         self.assertEqual(len(response.context["pagina"]), 1)
+
+
+class VendaTestCase(EstoqueTestCase):
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("estoque:nova_venda")
+
+    def vender(self, *itens, desconto=None, forma="dinheiro"):
+        return self.client.post(
+            self.url,
+            {
+                "itens": json.dumps(list(itens)),
+                "desconto": desconto or "",
+                "forma_pagamento": forma,
+            },
+        )
+
+    def item(self, quantidade, valor, embalagem=None, produto=None):
+        return {
+            "produto": (produto or self.produto).pk,
+            "embalagem": embalagem.pk if embalagem else None,
+            "quantidade": quantidade,
+            "valor_total": valor,
+        }
+
+
+class RegistrarVendaTests(VendaTestCase):
+    def test_venda_baixa_lotes_antigos_e_calcula_lucro(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.registrar_entrada(self.produto, 5, Decimal("2.00"))
+
+        response = self.vender(self.item(7, "21.00"))
+
+        venda = Venda.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("estoque:detalhe_venda", args=[venda.pk]),
+        )
+        self.assertEqual(self.saldos(), [0, 3])
+        self.assertEqual(venda.total, Decimal("21.00"))
+        self.assertEqual(venda.custo, Decimal("9.0000"))
+        self.assertEqual(venda.lucro, Decimal("12.0000"))
+        self.assertEqual(
+            MovimentacaoEstoque.objects.filter(
+                tipo=MovimentacaoEstoque.Tipo.VENDA,
+                venda=venda,
+            ).count(),
+            2,
+        )
+
+    def test_mudar_preco_e_custo_nao_altera_venda_antiga(self):
+        lote = services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        self.vender(self.item(2, "6.00"))
+
+        LoteEstoque.objects.filter(pk=lote.pk).update(preco_custo_unitario="9.00")
+        Produto.objects.filter(pk=self.produto.pk).update(preco_venda_base="99.00")
+
+        venda = Venda.objects.get()
+        self.assertEqual(venda.custo, Decimal("2.0000"))
+        self.assertEqual(venda.lucro, Decimal("4.0000"))
+
+    def test_pacote_vendido_com_preco_combinado(self):
+        services.registrar_entrada(self.produto, 40, Decimal("1.00"))
+
+        self.vender(self.item(1, "40.00", embalagem=self.caixa))
+
+        item = ItemVenda.objects.get()
+        self.assertEqual(item.quantidade, 30)
+        self.assertEqual(item.valor_total, Decimal("40.00"))
+        self.assertEqual(item.embalagem_descricao, "1 x Caixa (30 un.)")
+        self.assertEqual(self.saldos(), [10])
+        self.assertEqual(Venda.objects.get().lucro, Decimal("10.0000"))
+
+    def test_desconto_reduz_total_e_lucro(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+
+        self.vender(self.item(2, "6.00"), desconto="1.00")
+
+        venda = Venda.objects.get()
+        self.assertEqual(venda.total, Decimal("5.00"))
+        self.assertEqual(venda.lucro, Decimal("3.0000"))
+
+    def test_recusa_desconto_maior_que_a_venda(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+
+        response = self.vender(self.item(1, "3.00"), desconto="4.00")
+
+        self.assertContains(response, "desconto não pode ser maior")
+        self.assertFalse(Venda.objects.exists())
+        self.assertEqual(self.saldos(), [5])
+
+    def test_estoque_insuficiente_nao_grava_nada(self):
+        outro = Produto.objects.create(
+            nome="Caderno",
+            categoria=self.categoria,
+            preco_venda_base="9.00",
+        )
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.registrar_entrada(outro, 1, Decimal("4.00"))
+
+        response = self.vender(
+            self.item(5, "15.00"),
+            self.item(2, "18.00", produto=outro),
+        )
+
+        self.assertContains(response, "Caderno tem apenas 1 em estoque")
+        self.assertFalse(Venda.objects.exists())
+        self.assertEqual(self.saldos(), [5, 1])
+
+    def test_erro_mantem_itens_no_carrinho(self):
+        itens = [self.item(1, "3.00") | {"nome": "Biscoito", "fator": 1}]
+
+        response = self.vender(*itens)
+
+        self.assertEqual(json.loads(response.context["form"]["itens"].value()), itens)
+
+    def test_recusa_venda_vazia(self):
+        response = self.vender()
+
+        self.assertContains(response, "Adicione ao menos um produto")
+
+    def test_recusa_itens_malformados(self):
+        for itens in ["nao e json", "{}", "[1]", '[{"produto": 999}]']:
+            response = self.client.post(
+                self.url,
+                {"itens": itens, "forma_pagamento": "pix"},
+            )
+            self.assertEqual(response.status_code, 200)
+
+        self.assertFalse(Venda.objects.exists())
+
+    def test_recusa_produto_inativo(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        Produto.objects.update(ativo=False)
+
+        response = self.vender(self.item(1, "3.00"))
+
+        self.assertContains(response, "Revise os itens da venda")
+        self.assertFalse(Venda.objects.exists())
+
+    def test_recusa_embalagem_de_outro_produto(self):
+        outro = Produto.objects.create(
+            nome="Caderno",
+            categoria=self.categoria,
+            preco_venda_base="9.00",
+        )
+        services.registrar_entrada(outro, 50, Decimal("1.00"))
+
+        response = self.vender(self.item(1, "3.00", self.caixa, outro))
+
+        self.assertContains(response, "Revise os itens da venda")
+        self.assertFalse(Venda.objects.exists())
+
+
+class CancelarVendaTests(VendaTestCase):
+    def setUp(self):
+        super().setUp()
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.registrar_entrada(self.produto, 5, Decimal("2.00"))
+        self.vender(self.item(7, "21.00"))
+        self.venda = Venda.objects.get()
+        self.url_cancelar = reverse("estoque:cancelar_venda", args=[self.venda.pk])
+
+    def test_cancelamento_devolve_cada_lote_e_zera_resultado(self):
+        self.client.post(self.url_cancelar)
+
+        self.venda.refresh_from_db()
+        self.assertTrue(self.venda.cancelada)
+        self.assertIsNotNone(self.venda.cancelada_em)
+        self.assertEqual(self.saldos(), [5, 5])
+        self.assertEqual(self.venda.receita, 0)
+        self.assertEqual(self.venda.custo, 0)
+
+    def test_nao_cancela_duas_vezes(self):
+        self.client.post(self.url_cancelar)
+        self.client.post(self.url_cancelar)
+
+        self.assertEqual(self.saldos(), [5, 5])
+
+    def test_nao_cancela_venda_com_devolucao(self):
+        services.registrar_devolucao(self.venda.itens.get(), 1, True)
+
+        self.client.post(self.url_cancelar)
+
+        self.venda.refresh_from_db()
+        self.assertFalse(self.venda.cancelada)
+
+
+class DevolucaoTests(VendaTestCase):
+    def setUp(self):
+        super().setUp()
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.registrar_entrada(self.produto, 5, Decimal("2.00"))
+
+    def vender_e_obter(self, *itens, desconto=None):
+        self.vender(*itens, desconto=desconto)
+        return Venda.objects.get()
+
+    def test_devolucao_parcial_volta_ao_lote_de_origem(self):
+        venda = self.vender_e_obter(self.item(7, "21.00"))
+
+        self.client.post(
+            reverse("estoque:devolver_item", args=[venda.itens.get().pk]),
+            {"quantidade": 3, "voltar_ao_estoque": "on"},
+        )
+
+        self.assertEqual(Devolucao.objects.get().valor, Decimal("9.00"))
+        self.assertEqual(self.saldos(), [1, 5])
+        self.assertEqual(venda.receita, Decimal("12.00"))
+        self.assertEqual(venda.custo, Decimal("4.0000"))
+        self.assertEqual(venda.lucro, Decimal("8.0000"))
+
+    def test_produto_com_defeito_nao_volta_e_custo_continua(self):
+        venda = self.vender_e_obter(self.item(2, "6.00"))
+
+        self.client.post(
+            reverse("estoque:devolver_item", args=[venda.itens.get().pk]),
+            {"quantidade": 1},
+        )
+
+        self.assertEqual(self.saldos(), [3, 5])
+        self.assertEqual(venda.receita, Decimal("3.00"))
+        self.assertEqual(venda.custo, Decimal("2.0000"))
+        self.assertEqual(venda.lucro, Decimal("1.0000"))
+
+    def test_desconto_e_proporcional_na_devolucao(self):
+        venda = self.vender_e_obter(self.item(2, "10.00"), desconto="1.00")
+
+        devolucao = services.registrar_devolucao(venda.itens.get(), 1, True)
+
+        self.assertEqual(devolucao.valor, Decimal("4.50"))
+
+    def test_devolver_tudo_em_partes_zera_sem_sobrar_centavo(self):
+        venda = self.vender_e_obter(self.item(3, "10.00"), desconto="0.01")
+        item = venda.itens.get()
+
+        for _ in range(3):
+            services.registrar_devolucao(item, 1, True)
+
+        self.assertEqual(venda.receita, 0)
+        self.assertEqual(venda.custo, 0)
+        self.assertEqual(self.saldos(), [5, 5])
+
+    def test_nao_devolve_mais_que_o_vendido(self):
+        venda = self.vender_e_obter(self.item(2, "6.00"))
+
+        response = self.client.post(
+            reverse("estoque:devolver_item", args=[venda.itens.get().pk]),
+            {"quantidade": 3, "voltar_ao_estoque": "on"},
+        )
+
+        self.assertContains(response, "Restam apenas 2 unidades")
+        self.assertFalse(Devolucao.objects.exists())
+
+    def test_nao_devolve_venda_cancelada(self):
+        venda = self.vender_e_obter(self.item(2, "6.00"))
+        services.cancelar_venda(venda)
+
+        response = self.client.post(
+            reverse("estoque:devolver_item", args=[venda.itens.get().pk]),
+            {"quantidade": 1, "voltar_ao_estoque": "on"},
+        )
+
+        self.assertContains(response, "Essa venda foi cancelada")
+        self.assertEqual(self.saldos(), [5, 5])
+
+
+class BuscaEListaVendasTests(VendaTestCase):
+    def buscar(self, termo):
+        return self.client.get(
+            reverse("estoque:buscar_produtos"),
+            {"q": termo},
+        ).json()
+
+    def test_busca_por_nome(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+
+        dados = self.buscar("bisc")
+
+        self.assertFalse(dados["exato"])
+        self.assertEqual(dados["resultados"][0]["saldo"], 5)
+        self.assertEqual(dados["resultados"][0]["embalagens"][0]["fator"], 30)
+
+    def test_codigo_da_unidade_e_exato(self):
+        Produto.objects.update(codigo_barras_unidade="789")
+
+        dados = self.buscar("789")
+
+        self.assertTrue(dados["exato"])
+        self.assertIsNone(dados["embalagem"])
+
+    def test_codigo_da_embalagem_indica_a_embalagem(self):
+        UnidadeMedida.objects.update(codigo_barras="111")
+
+        dados = self.buscar("111")
+
+        self.assertTrue(dados["exato"])
+        self.assertEqual(dados["embalagem"], self.caixa.pk)
+
+    def test_busca_ignora_inativos(self):
+        Produto.objects.update(ativo=False)
+
+        self.assertEqual(self.buscar("bisc")["resultados"], [])
+
+    def test_lista_filtra_por_data(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        self.vender(self.item(1, "3.00"))
+        url = reverse("estoque:listar_vendas")
+
+        self.assertEqual(len(self.client.get(url).context["pagina"]), 1)
+        self.assertEqual(
+            len(self.client.get(url, {"de": "2999-01-01"}).context["pagina"]),
+            0,
+        )
+
+    def test_data_invalida_e_ignorada(self):
+        response = self.client.get(
+            reverse("estoque:listar_vendas"),
+            {"de": "2026-13-45"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["pagina"]), 0)
+
+    def test_excluir_entrada_vendida_e_bloqueado(self):
+        lote = services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        self.vender(self.item(1, "3.00"))
+
+        self.client.post(reverse("estoque:excluir_entrada", args=[lote.pk]))
+
+        self.assertTrue(LoteEstoque.objects.filter(pk=lote.pk).exists())
 
 
 class AcessoTests(TestCase):
