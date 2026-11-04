@@ -2,7 +2,11 @@ from django.urls import path
 from estoque.views import (
     ajustarEstoque,
     alterarStatusProduto,
+    buscarProdutos,
     cadastrarProduto,
+    cancelarVenda,
+    detalheVenda,
+    devolverItem,
     editarCategoria,
     editarProduto,
     estoqueProduto,
@@ -11,6 +15,8 @@ from estoque.views import (
     listarCategorias,
     listarMovimentacoes,
     listarProdutos,
+    listarVendas,
+    novaVenda,
     registrarEntrada,
 )
 app_name = 'estoque'
@@ -24,6 +30,12 @@ urlpatterns = [
     path('itens/<int:pk>/ajuste/', ajustarEstoque, name='ajustar_estoque'),
     path('lotes/<int:pk>/excluir/', excluirEntrada, name='excluir_entrada'),
     path('movimentacoes/', listarMovimentacoes, name='listar_movimentacoes'),
+    path('vendas/', listarVendas, name='listar_vendas'),
+    path('vendas/nova/', novaVenda, name='nova_venda'),
+    path('vendas/produtos/', buscarProdutos, name='buscar_produtos'),
+    path('vendas/<int:pk>/', detalheVenda, name='detalhe_venda'),
+    path('vendas/<int:pk>/cancelar/', cancelarVenda, name='cancelar_venda'),
+    path('vendas/itens/<int:pk>/devolver/', devolverItem, name='devolver_item'),
     path('categorias/', listarCategorias, name='listar_categorias'),
     path('categorias/<int:pk>/editar/', editarCategoria, name='editar_categoria'),
     path('categorias/<int:pk>/excluir/', excluirCategoria, name='excluir_categoria'),

@@ -1,21 +1,26 @@
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.http import JsonResponse
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, OuterRef, ProtectedError, Q, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import formats
 from django.views.decorators.http import require_POST
 
 from estoque import services
 from estoque.forms import (
     AjusteEstoqueForm,
     CategoriaForm,
+    DevolucaoForm,
     EntradaEstoqueForm,
     FiltroProdutosForm,
+    FiltroVendasForm,
     ProdutoForm,
     UnidadeMedidaFormSet,
+    VendaForm,
 )
-from .models import Categoria, LoteEstoque, MovimentacaoEstoque, Produto
+from .models import Categoria, ItemVenda, LoteEstoque, MovimentacaoEstoque, Produto, UnidadeMedida, Venda
 # Create your views here.
 
 def listarProdutos(request):
@@ -193,6 +198,128 @@ def listarMovimentacoes(request):
         'parametros': f'tipo={tipo}' if tipo else '',
     }
     return render(request, 'listar_movimentacoes.html', context)
+
+def listarVendas(request):
+    vendas = Venda.objects.all()
+    filtro = FiltroVendasForm(request.GET)
+    filtro.is_valid()
+    if filtro.cleaned_data.get('de'):
+        vendas = vendas.filter(data__date__gte=filtro.cleaned_data['de'])
+    if filtro.cleaned_data.get('ate'):
+        vendas = vendas.filter(data__date__lte=filtro.cleaned_data['ate'])
+
+    parametros = request.GET.copy()
+    parametros.pop('page', None)
+    context = {
+        'pagina': Paginator(vendas, 25).get_page(request.GET.get('page')),
+        'filtro': filtro,
+        'parametros': parametros.urlencode(),
+    }
+    return render(request, 'listar_vendas.html', context)
+
+def buscarProdutos(request):
+    termo = request.GET.get('q', '').strip()
+    ativos = Produto.objects.filter(ativo=True)
+    embalagem = None
+    if not termo:
+        produtos = ativos.none()
+    else:
+        embalagem = UnidadeMedida.objects.filter(
+            codigo_barras=termo,
+            produto__ativo=True,
+        ).first()
+        if embalagem:
+            produtos = ativos.filter(pk=embalagem.produto_id)
+        else:
+            produtos = ativos.filter(codigo_barras_unidade=termo)
+    exato = produtos.exists()
+    if termo and not exato:
+        produtos = ativos.filter(nome__icontains=termo)
+
+    produtos = produtos.annotate(
+        saldo=Coalesce(Sum('loteestoque__quantidade_disponivel'), 0)
+    ).order_by('nome').prefetch_related('unidademedida_set')[:10]
+    resultados = [
+        {
+            'id': produto.pk,
+            'nome': produto.nome,
+            'preco': str(produto.preco_venda_base),
+            'saldo': produto.saldo,
+            'embalagens': [
+                {
+                    'id': opcao.pk,
+                    'tipo': opcao.tipo,
+                    'fator': opcao.fator_conversao,
+                }
+                for opcao in produto.unidademedida_set.all()
+            ],
+        }
+        for produto in produtos
+    ]
+    return JsonResponse({
+        'resultados': resultados,
+        'exato': exato,
+        'embalagem': embalagem.pk if embalagem else None,
+    })
+
+def novaVenda(request):
+    form = VendaForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            venda = services.registrar_venda(
+                form.cleaned_data['itens'],
+                form.cleaned_data['desconto'],
+                form.cleaned_data['forma_pagamento'],
+            )
+        except services.ErroEstoque as erro:
+            form.add_error(None, str(erro))
+        else:
+            messages.success(request, "Venda registrada.")
+            return redirect("estoque:detalhe_venda", pk=venda.pk)
+
+    return render(request, 'nova_venda.html', {'form': form})
+
+def detalheVenda(request, pk):
+    venda = get_object_or_404(Venda, pk=pk)
+    itens = venda.itens.select_related('produto').prefetch_related('devolucoes')
+    return render(
+        request,
+        'detalhe_venda.html',
+        {'venda': venda, 'itens': itens},
+    )
+
+@require_POST
+def cancelarVenda(request, pk):
+    venda = get_object_or_404(Venda, pk=pk)
+    try:
+        services.cancelar_venda(venda)
+    except services.ErroEstoque as erro:
+        messages.error(request, str(erro))
+    else:
+        messages.success(request, "Venda cancelada e estoque restaurado.")
+    return redirect("estoque:detalhe_venda", pk=venda.pk)
+
+def devolverItem(request, pk):
+    item = get_object_or_404(ItemVenda.objects.select_related('produto', 'venda'), pk=pk)
+    form = DevolucaoForm(request.POST or None, initial={'quantidade': item.quantidade_restante})
+    if request.method == "POST" and form.is_valid():
+        try:
+            devolucao = services.registrar_devolucao(
+                item,
+                form.cleaned_data['quantidade'],
+                form.cleaned_data['voltar_ao_estoque'],
+                form.cleaned_data['motivo'],
+            )
+        except services.ErroEstoque as erro:
+            form.add_error(None, str(erro))
+        else:
+            messages.success(
+                request,
+                f"Devolução registrada: R$ {formats.localize(devolucao.valor)}.",
+            )
+            return redirect("estoque:detalhe_venda", pk=item.venda_id)
+
+    return render(request, 'devolver_item.html', {'item': item, 'form': form})
 
 def listarCategorias(request):
     form = CategoriaForm(request.POST or None)

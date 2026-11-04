@@ -1,0 +1,70 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Venda {{ venda.pk }}{% endblock %}
+
+{% block body_content %}
+<div class="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div>
+        <h1 class="text-2xl font-bold">
+            Venda {{ venda.pk }}
+            {% if venda.cancelada %}<span class="badge badge-error ml-1 align-middle">Cancelada</span>{% endif %}
+        </h1>
+        <p class="text-sm opacity-70">{{ venda.data|date:"d/m/Y H:i" }} · {{ venda.get_forma_pagamento_display }}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a class="btn btn-primary" href="{% url 'estoque:nova_venda' %}">Nova venda</a>
+        {% if not venda.cancelada %}
+            <form method="post" action="{% url 'estoque:cancelar_venda' venda.pk %}" onsubmit="return confirm('Cancelar esta venda e devolver os produtos ao estoque?');">
+                {% csrf_token %}
+                <button class="btn btn-outline btn-error" type="submit">Cancelar venda</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid items-start gap-5 lg:grid-cols-[1fr_20rem]">
+    <ul class="grid gap-3">
+        {% for item in itens %}
+            <li class="rounded-box bg-base-100 p-4 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="font-semibold">{{ item.produto.nome }}</p>
+                        <p class="text-sm opacity-70">{% if item.embalagem_descricao %}{{ item.embalagem_descricao }}{% else %}{{ item.quantidade }} unidade{{ item.quantidade|pluralize }}{% endif %}</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-semibold">R$ {{ item.valor_total }}</span>
+                        {% if not venda.cancelada and item.quantidade_restante %}
+                            <a class="btn btn-sm" href="{% url 'estoque:devolver_item' item.pk %}">Devolver</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% for devolucao in item.devolucoes.all %}
+                    <p class="mt-2 text-sm opacity-70">
+                        Devolução em {{ devolucao.data|date:"d/m/Y" }}: {{ devolucao.quantidade }} unidade{{ devolucao.quantidade|pluralize }}, R$ {{ devolucao.valor }}{% if not devolucao.voltou_ao_estoque %}, sem voltar ao estoque{% endif %}{% if devolucao.motivo %} ({{ devolucao.motivo }}){% endif %}
+                    </p>
+                {% endfor %}
+            </li>
+        {% endfor %}
+    </ul>
+
+    <section class="rounded-box bg-base-100 p-5 shadow-sm">
+        <h2 class="mb-3 text-lg font-semibold">Resumo</h2>
+        <dl class="grid grid-cols-[1fr_auto] gap-1">
+            <dt class="opacity-70">Subtotal</dt>
+            <dd class="text-right">R$ {{ venda.subtotal }}</dd>
+            <dt class="opacity-70">Desconto</dt>
+            <dd class="text-right">R$ {{ venda.desconto }}</dd>
+            <dt class="opacity-70">Total</dt>
+            <dd class="text-right">R$ {{ venda.total }}</dd>
+            {% if venda.valor_devolvido %}
+                <dt class="opacity-70">Devolvido</dt>
+                <dd class="text-right">R$ {{ venda.valor_devolvido|floatformat:2 }}</dd>
+            {% endif %}
+            <dt class="opacity-70">Custo dos produtos</dt>
+            <dd class="text-right">R$ {{ venda.custo|floatformat:2 }}</dd>
+            <dt class="mt-2 text-lg font-bold">Lucro bruto</dt>
+            <dd class="mt-2 text-right text-lg font-bold">R$ {{ venda.lucro|floatformat:2 }}</dd>
+        </dl>
+    </section>
+</div>
+{% endblock %}

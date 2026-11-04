@@ -1,11 +1,20 @@
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import F, Sum
+from django.utils import timezone
 
-from .models import LoteEstoque, MovimentacaoEstoque
+from .models import (
+    Devolucao,
+    ItemVenda,
+    ItemVendaLote,
+    LoteEstoque,
+    MovimentacaoEstoque,
+    Venda,
+)
 
 CASAS_CUSTO = Decimal("0.0001")
+CENTAVOS = Decimal("0.01")
 
 
 class ErroEstoque(Exception):
@@ -108,3 +117,134 @@ def excluir_entrada(lote):
         )
     movimentacoes.delete()
     lote.delete()
+
+
+def devolver_ao_lote(lote_id, quantidade, venda, tipo):
+    LoteEstoque.objects.filter(pk=lote_id).update(
+        quantidade_disponivel=F("quantidade_disponivel") + quantidade
+    )
+    MovimentacaoEstoque.objects.create(
+        lote_id=lote_id,
+        venda=venda,
+        tipo=tipo,
+        quantidade=quantidade,
+    )
+
+
+@transaction.atomic
+def registrar_venda(itens, desconto, forma_pagamento):
+    subtotal = sum(item["valor_total"] for item in itens)
+    if desconto > subtotal:
+        raise ErroEstoque("O desconto não pode ser maior que o valor da venda.")
+
+    venda = Venda.objects.create(
+        forma_pagamento=forma_pagamento,
+        subtotal=subtotal,
+        desconto=desconto,
+        total=subtotal - desconto,
+    )
+    for dados in itens:
+        embalagem = dados.get("embalagem")
+        fator = embalagem.fator_conversao if embalagem else 1
+        unidades = dados["quantidade"] * fator
+        item = ItemVenda.objects.create(
+            venda=venda,
+            produto=dados["produto"],
+            embalagem_descricao=(
+                f"{dados['quantidade']} x {embalagem.tipo} ({fator} un.)"
+                if embalagem
+                else ""
+            ),
+            quantidade=unidades,
+            valor_total=dados["valor_total"],
+        )
+        for lote, retirada in consumir_lotes(dados["produto"], unidades):
+            ItemVendaLote.objects.create(
+                item=item,
+                lote=lote,
+                quantidade=retirada,
+                custo_unitario=lote.preco_custo_unitario,
+            )
+            MovimentacaoEstoque.objects.create(
+                lote=lote,
+                venda=venda,
+                tipo=MovimentacaoEstoque.Tipo.VENDA,
+                quantidade=-retirada,
+            )
+    return venda
+
+
+@transaction.atomic
+def cancelar_venda(venda):
+    venda = Venda.objects.select_for_update().get(pk=venda.pk)
+    if venda.cancelada:
+        raise ErroEstoque("Essa venda já foi cancelada.")
+    if Devolucao.objects.filter(item__venda=venda).exists():
+        raise ErroEstoque("Essa venda tem devoluções e não pode ser cancelada.")
+
+    for vendido in ItemVendaLote.objects.filter(item__venda=venda):
+        devolver_ao_lote(
+            vendido.lote_id,
+            vendido.quantidade,
+            venda,
+            MovimentacaoEstoque.Tipo.CANCELAMENTO,
+        )
+
+    venda.status = Venda.Status.CANCELADA
+    venda.cancelada_em = timezone.now()
+    venda.save(update_fields=["status", "cancelada_em"])
+
+
+def calcular_valor_devolucao(venda, item, quantidade):
+    """Divide o desconto entre os itens e evita sobra de centavos no fim."""
+    unidades_restantes = sum(
+        outro.quantidade_restante for outro in venda.itens.all()
+    )
+    if quantidade == unidades_restantes:
+        return venda.total - venda.valor_devolvido
+
+    proporcao = venda.total / venda.subtotal if venda.subtotal else Decimal("0")
+    valor_item = item.valor_total * proporcao
+    if quantidade == item.quantidade_restante:
+        ja_devolvido = item.devolucoes.aggregate(total=Sum("valor"))["total"] or 0
+        return (valor_item - ja_devolvido).quantize(CENTAVOS)
+    return (valor_item * quantidade / item.quantidade).quantize(CENTAVOS)
+
+
+@transaction.atomic
+def registrar_devolucao(item, quantidade, voltar_ao_estoque, motivo=""):
+    venda = Venda.objects.select_for_update().get(pk=item.venda_id)
+    if venda.cancelada:
+        raise ErroEstoque("Essa venda foi cancelada.")
+    if quantidade > item.quantidade_restante:
+        raise ErroEstoque(
+            f"Restam apenas {item.quantidade_restante} unidades para devolver."
+        )
+
+    devolucao = Devolucao.objects.create(
+        item=item,
+        quantidade=quantidade,
+        valor=calcular_valor_devolucao(venda, item, quantidade),
+        voltou_ao_estoque=voltar_ao_estoque,
+        motivo=motivo,
+    )
+    if not voltar_ao_estoque:
+        return devolucao
+
+    restante = quantidade
+    for vendido in item.lotes.select_for_update().order_by("-pk"):
+        retorno = min(restante, vendido.quantidade - vendido.quantidade_devolvida)
+        if not retorno:
+            continue
+        vendido.quantidade_devolvida += retorno
+        vendido.save(update_fields=["quantidade_devolvida"])
+        devolver_ao_lote(
+            vendido.lote_id,
+            retorno,
+            venda,
+            MovimentacaoEstoque.Tipo.DEVOLUCAO,
+        )
+        restante -= retorno
+        if not restante:
+            break
+    return devolucao

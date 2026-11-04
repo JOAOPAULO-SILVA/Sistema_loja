@@ -1,0 +1,53 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Vendas{% endblock %}
+
+{% block body_content %}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-bold">Vendas</h1>
+    <a class="btn btn-primary" href="{% url 'estoque:nova_venda' %}">Nova venda</a>
+</div>
+
+<form method="get" class="mb-5 grid gap-3 rounded-box bg-base-100 p-4 shadow-sm sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+    <div>
+        <label class="label mb-1 block text-sm font-medium" for="{{ filtro.de.id_for_label }}">De</label>
+        {{ filtro.de }}
+    </div>
+    <div>
+        <label class="label mb-1 block text-sm font-medium" for="{{ filtro.ate.id_for_label }}">Até</label>
+        {{ filtro.ate }}
+    </div>
+    <button class="btn btn-neutral" type="submit">Filtrar</button>
+</form>
+
+<div class="overflow-x-auto rounded-box bg-base-100 shadow-sm">
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Venda</th>
+                <th scope="col">Data</th>
+                <th scope="col" class="hidden sm:table-cell">Pagamento</th>
+                <th scope="col" class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for venda in pagina %}
+                <tr{% if venda.cancelada %} class="opacity-60"{% endif %}>
+                    <th scope="row"><a class="link" href="{% url 'estoque:detalhe_venda' venda.pk %}">{{ venda.pk }}</a></th>
+                    <td class="whitespace-nowrap">{{ venda.data|date:"d/m/Y H:i" }}</td>
+                    <td class="hidden sm:table-cell">{{ venda.get_forma_pagamento_display }}</td>
+                    <td class="whitespace-nowrap text-right">
+                        R$ {{ venda.total }}
+                        {% if venda.cancelada %}<span class="badge badge-ghost badge-sm ml-1">Cancelada</span>{% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="4" class="py-8 text-center opacity-70">Nenhuma venda encontrada.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% include 'paginacao.html' %}
+{% endblock %}
