@@ -1,10 +1,13 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from django.urls import reverse
 
+from . import services
 from .forms import CategoriaForm
-from .models import Categoria, Produto, UnidadeMedida
+from .models import Categoria, LoteEstoque, MovimentacaoEstoque, Produto, UnidadeMedida
 
 
 class UsuarioLogadoTestCase(TestCase):
@@ -307,6 +310,219 @@ class CategoriaTests(UsuarioLogadoTestCase):
         self.client.post(url)
 
         self.assertTrue(Categoria.objects.filter(pk=self.categoria.pk).exists())
+
+
+class EstoqueTestCase(UsuarioLogadoTestCase):
+    def setUp(self):
+        super().setUp()
+        self.produto = Produto.objects.create(
+            nome="Biscoito",
+            categoria=self.categoria,
+            preco_venda_base="3.00",
+        )
+        self.caixa = UnidadeMedida.objects.create(
+            produto=self.produto,
+            tipo="Caixa",
+            fator_conversao=30,
+        )
+
+    def saldos(self):
+        return list(
+            LoteEstoque.objects.order_by("pk").values_list(
+                "quantidade_disponivel", flat=True
+            )
+        )
+
+
+class EntradaEstoqueTests(EstoqueTestCase):
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("estoque:registrar_entrada", args=[self.produto.pk])
+
+    def test_entrada_por_embalagem_calcula_unidades_e_custo(self):
+        response = self.client.post(
+            self.url,
+            {"embalagem": self.caixa.pk, "quantidade": 2, "preco": "45.00"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("estoque:estoque_produto", args=[self.produto.pk]),
+        )
+        lote = LoteEstoque.objects.get()
+        self.assertEqual(lote.quantidade_inicial, 60)
+        self.assertEqual(lote.quantidade_disponivel, 60)
+        self.assertEqual(lote.preco_custo_unitario, Decimal("1.5000"))
+        self.assertEqual(lote.embalagem, self.caixa)
+        movimentacao = MovimentacaoEstoque.objects.get()
+        self.assertEqual(movimentacao.tipo, MovimentacaoEstoque.Tipo.ENTRADA)
+        self.assertEqual(movimentacao.quantidade, 60)
+
+    def test_entrada_por_unidade(self):
+        self.client.post(self.url, {"quantidade": 10, "preco": "2.00"})
+
+        lote = LoteEstoque.objects.get()
+        self.assertEqual(lote.quantidade_disponivel, 10)
+        self.assertEqual(lote.preco_custo_unitario, Decimal("2.0000"))
+        self.assertIsNone(lote.embalagem)
+
+    def test_custo_guarda_quatro_casas(self):
+        tres = UnidadeMedida.objects.create(
+            produto=self.produto,
+            tipo="Trio",
+            fator_conversao=3,
+        )
+
+        self.client.post(
+            self.url,
+            {"embalagem": tres.pk, "quantidade": 1, "preco": "10.00"},
+        )
+
+        self.assertEqual(
+            LoteEstoque.objects.get().preco_custo_unitario,
+            Decimal("3.3333"),
+        )
+
+    def test_recusa_embalagem_de_outro_produto(self):
+        outro = Produto.objects.create(
+            nome="Caderno",
+            categoria=self.categoria,
+            preco_venda_base="9.00",
+        )
+        embalagem = UnidadeMedida.objects.create(
+            produto=outro,
+            tipo="Pacote",
+            fator_conversao=5,
+        )
+
+        response = self.client.post(
+            self.url,
+            {"embalagem": embalagem.pk, "quantidade": 1, "preco": "10.00"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(LoteEstoque.objects.exists())
+
+    def test_remover_embalagem_preserva_o_lote(self):
+        services.registrar_entrada(self.produto, 1, Decimal("30.00"), self.caixa)
+
+        self.caixa.delete()
+
+        lote = LoteEstoque.objects.get()
+        self.assertIsNone(lote.embalagem)
+        self.assertEqual(lote.quantidade_disponivel, 30)
+
+    def test_exclui_entrada_sem_movimentacoes(self):
+        lote = services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+
+        self.client.post(reverse("estoque:excluir_entrada", args=[lote.pk]))
+
+        self.assertFalse(LoteEstoque.objects.exists())
+        self.assertFalse(MovimentacaoEstoque.objects.exists())
+
+    def test_nao_exclui_entrada_movimentada(self):
+        lote = services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.ajustar_estoque(self.produto, "retirar", 1, "perda")
+
+        self.client.post(reverse("estoque:excluir_entrada", args=[lote.pk]))
+
+        self.assertTrue(LoteEstoque.objects.filter(pk=lote.pk).exists())
+
+
+class AjusteEstoqueTests(EstoqueTestCase):
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("estoque:ajustar_estoque", args=[self.produto.pk])
+
+    def dados(self, operacao, quantidade):
+        return {
+            "operacao": operacao,
+            "quantidade": quantidade,
+            "motivo": "perda",
+            "observacao": "Molhou",
+        }
+
+    def test_retirada_consome_lote_mais_antigo_primeiro(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.registrar_entrada(self.produto, 5, Decimal("2.00"))
+
+        self.client.post(self.url, self.dados("retirar", 7))
+
+        self.assertEqual(self.saldos(), [0, 3])
+        self.assertEqual(
+            sorted(
+                MovimentacaoEstoque.objects.filter(
+                    tipo=MovimentacaoEstoque.Tipo.AJUSTE
+                ).values_list("quantidade", flat=True)
+            ),
+            [-5, -2],
+        )
+
+    def test_nao_retira_mais_que_o_saldo(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+
+        response = self.client.post(self.url, self.dados("retirar", 6))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "apenas 5 em estoque")
+        self.assertEqual(self.saldos(), [5])
+
+    def test_acrescimo_vai_para_o_lote_mais_recente(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.registrar_entrada(self.produto, 5, Decimal("2.00"))
+
+        self.client.post(self.url, self.dados("acrescentar", 2))
+
+        self.assertEqual(self.saldos(), [5, 7])
+
+    def test_acrescimo_sem_lote_pede_entrada(self):
+        response = self.client.post(self.url, self.dados("acrescentar", 2))
+
+        self.assertContains(response, "Registre uma entrada primeiro")
+        self.assertFalse(MovimentacaoEstoque.objects.exists())
+
+
+class TelasEstoqueTests(EstoqueTestCase):
+    def test_lista_mostra_saldo_custo_e_lucro(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.registrar_entrada(self.produto, 5, Decimal("2.00"))
+
+        response = self.client.get(reverse("estoque:listar_produtos"))
+
+        produto = response.context["pagina"][0]
+        self.assertEqual(produto.saldo, 10)
+        self.assertEqual(produto.ultimo_custo, Decimal("2.0000"))
+        self.assertEqual(produto.lucro_unitario, Decimal("1.0000"))
+
+    def test_lista_produto_sem_estoque(self):
+        response = self.client.get(reverse("estoque:listar_produtos"))
+
+        produto = response.context["pagina"][0]
+        self.assertEqual(produto.saldo, 0)
+        self.assertIsNone(produto.lucro_unitario)
+
+    def test_pagina_do_produto_mostra_saldo_e_historico(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.ajustar_estoque(self.produto, "retirar", 2, "quebra")
+
+        response = self.client.get(
+            reverse("estoque:estoque_produto", args=[self.produto.pk])
+        )
+
+        self.assertEqual(response.context["saldo"], 3)
+        self.assertEqual(len(response.context["pagina"]), 2)
+        self.assertContains(response, "Quebra")
+
+    def test_filtra_movimentacoes_por_tipo(self):
+        services.registrar_entrada(self.produto, 5, Decimal("1.00"))
+        services.ajustar_estoque(self.produto, "retirar", 2, "quebra")
+
+        response = self.client.get(
+            reverse("estoque:listar_movimentacoes"),
+            {"tipo": "ajuste"},
+        )
+
+        self.assertEqual(len(response.context["pagina"]), 1)
 
 
 class AcessoTests(TestCase):

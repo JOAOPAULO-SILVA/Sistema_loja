@@ -1,4 +1,5 @@
 <div class="flex justify-end gap-2">
+    <a class="btn btn-sm" href="{% url 'estoque:estoque_produto' produto.pk %}">Estoque</a>
     <a class="btn btn-sm" href="{% url 'estoque:editar_produto' produto.pk %}">Editar</a>
     <form method="post" action="{% url 'estoque:alterar_status_produto' produto.pk %}">
         {% csrf_token %}

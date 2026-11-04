@@ -66,10 +66,24 @@ class UnidadeMedida(models.Model):
 
 class LoteEstoque(models.Model):
     produto = models.ForeignKey(Produto, on_delete=models.PROTECT)
-    data_entrada = models.DateTimeField(default=timezone.now, editable=False)
-    preco_custo_unitario = models.DecimalField(
+    embalagem = models.ForeignKey(
+        UnidadeMedida,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    quantidade_embalagens = models.PositiveIntegerField(null=True, blank=True)
+    preco_embalagem = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+    )
+    data_entrada = models.DateTimeField(default=timezone.now, editable=False)
+    preco_custo_unitario = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
         validators=[MinValueValidator(0)],
     )
     quantidade_inicial = models.PositiveIntegerField()
@@ -78,6 +92,35 @@ class LoteEstoque(models.Model):
     class Meta:
         verbose_name = "Lote de estoque"
         verbose_name_plural = "Lotes de estoque"
+        ordering = ["data_entrada", "pk"]
 
     def __str__(self):
         return f"{self.produto.nome} - lote {self.pk}"
+
+
+class MovimentacaoEstoque(models.Model):
+    class Tipo(models.TextChoices):
+        ENTRADA = "entrada", "Entrada"
+        AJUSTE = "ajuste", "Ajuste"
+
+    class Motivo(models.TextChoices):
+        PERDA = "perda", "Perda"
+        QUEBRA = "quebra", "Quebra"
+        CONTAGEM = "contagem", "Contagem"
+        CONSUMO = "consumo", "Consumo próprio"
+        OUTRO = "outro", "Outro"
+
+    lote = models.ForeignKey(LoteEstoque, on_delete=models.PROTECT)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    quantidade = models.IntegerField()
+    motivo = models.CharField(max_length=20, choices=Motivo.choices, blank=True)
+    observacao = models.CharField(max_length=200, blank=True)
+    data = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        verbose_name = "Movimentação de estoque"
+        verbose_name_plural = "Movimentações de estoque"
+        ordering = ["-data", "-pk"]
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} de {self.quantidade} - {self.lote}"

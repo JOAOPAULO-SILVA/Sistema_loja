@@ -1,12 +1,7 @@
 from django import forms
 from django.forms import inlineformset_factory
 
-from .models import Categoria, LoteEstoque, Produto, UnidadeMedida
-
-
-class ProdutoChoiceField(forms.ModelChoiceField):
-    def label_from_instance(self, obj):
-        return f"{obj.nome} ({obj.codigo_barras_unidade})"
+from .models import Categoria, MovimentacaoEstoque, Produto, UnidadeMedida
 
 
 class CategoriaForm(forms.ModelForm):
@@ -113,34 +108,65 @@ UnidadeMedidaFormSet = inlineformset_factory(
 )
 
 
-class LoteEstoqueForm(forms.ModelForm):
-    produto = ProdutoChoiceField(
-        queryset=Produto.objects.all(),
-        label="Produto",
+class EntradaEstoqueForm(forms.Form):
+    embalagem = forms.ModelChoiceField(
+        queryset=UnidadeMedida.objects.none(),
+        required=False,
+        label="Comprado em",
+        empty_label="Unidade",
         widget=forms.Select(attrs={"class": "select w-full"}),
     )
+    quantidade = forms.IntegerField(
+        min_value=1,
+        label="Quantidade comprada",
+        widget=forms.NumberInput(
+            attrs={"class": "input w-full", "min": "1", "step": "1"}
+        ),
+    )
+    preco = forms.DecimalField(
+        min_value=0,
+        max_digits=10,
+        decimal_places=2,
+        label="Valor pago por unidade ou embalagem",
+        widget=forms.NumberInput(
+            attrs={"class": "input w-full", "min": "0", "step": "0.01"}
+        ),
+    )
 
-    class Meta:
-        model = LoteEstoque
-        fields = [
-            "produto",
-            "preco_custo_unitario",
-            "quantidade_inicial",
-            "quantidade_disponivel",
-        ]
-        labels = {
-            "preco_custo_unitario": "Custo por unidade",
-            "quantidade_inicial": "Quantidade inicial em unidades",
-            "quantidade_disponivel": "Quantidade disponível em unidades",
-        }
-        widgets = {
-            "preco_custo_unitario": forms.NumberInput(
-                attrs={"class": "input w-full", "step": "0.01", "min": "0"}
-            ),
-            "quantidade_inicial": forms.NumberInput(
-                attrs={"class": "input w-full", "min": "0", "step": "1"}
-            ),
-            "quantidade_disponivel": forms.NumberInput(
-                attrs={"class": "input w-full", "min": "0", "step": "1"}
-            ),
-        }
+    def __init__(self, *args, produto, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["embalagem"].queryset = produto.unidademedida_set.all()
+        self.fields["embalagem"].label_from_instance = (
+            lambda embalagem: f"{embalagem.tipo} ({embalagem.fator_conversao} unidades)"
+        )
+
+
+class AjusteEstoqueForm(forms.Form):
+    OPERACOES = [
+        ("retirar", "Retirar do estoque"),
+        ("acrescentar", "Acrescentar ao estoque"),
+    ]
+
+    operacao = forms.ChoiceField(
+        choices=OPERACOES,
+        label="Operação",
+        widget=forms.Select(attrs={"class": "select w-full"}),
+    )
+    quantidade = forms.IntegerField(
+        min_value=1,
+        label="Quantidade em unidades",
+        widget=forms.NumberInput(
+            attrs={"class": "input w-full", "min": "1", "step": "1"}
+        ),
+    )
+    motivo = forms.ChoiceField(
+        choices=MovimentacaoEstoque.Motivo.choices,
+        label="Motivo",
+        widget=forms.Select(attrs={"class": "select w-full"}),
+    )
+    observacao = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Observação (opcional)",
+        widget=forms.TextInput(attrs={"class": "input w-full"}),
+    )

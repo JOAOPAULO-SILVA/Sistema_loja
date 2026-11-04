@@ -1,0 +1,54 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Registrar entrada{% endblock %}
+
+{% block body_content %}
+<div class="mb-5">
+    <h1 class="text-2xl font-bold">Registrar entrada</h1>
+    <p class="text-sm opacity-70">{{ produto.nome }}</p>
+</div>
+
+<form method="post" class="card max-w-xl bg-base-100 shadow-sm" id="form-entrada">
+    <div class="card-body">
+        {% csrf_token %}
+        {% for erro in form.non_field_errors %}
+            <div class="alert alert-error mb-2" role="alert">{{ erro }}</div>
+        {% endfor %}
+        {% include 'setup/campo.html' with campo=form.embalagem %}
+        {% if not form.embalagem.field.queryset.exists %}
+            <p class="-mt-2 mb-4 text-sm opacity-70">
+                Este produto não tem embalagens.
+                <a class="link link-primary" href="{% url 'estoque:editar_produto' produto.pk %}">Cadastrar embalagem</a>
+            </p>
+        {% endif %}
+        {% include 'setup/campo.html' with campo=form.quantidade %}
+        {% include 'setup/campo.html' with campo=form.preco %}
+        <p class="mb-4 text-sm" id="resumo-entrada" aria-live="polite" hidden></p>
+        <div class="flex flex-wrap gap-3">
+            <button class="btn btn-primary" type="submit">Registrar entrada</button>
+            <a class="btn btn-ghost" href="{% url 'estoque:estoque_produto' produto.pk %}">Voltar</a>
+        </div>
+    </div>
+</form>
+
+{{ embalagens|json_script:"fatores-embalagem" }}
+<script>
+    (() => {
+        const form = document.getElementById("form-entrada");
+        const resumo = document.getElementById("resumo-entrada");
+        const fatores = JSON.parse(document.getElementById("fatores-embalagem").textContent);
+        const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+        const atualizar = () => {
+            const fator = fatores[form.elements.embalagem.value] || 1;
+            const quantidade = Number(form.elements.quantidade.value);
+            const preco = form.elements.preco.value;
+            resumo.hidden = !quantidade || preco === "";
+            resumo.textContent = `${quantidade * fator} unidades, a ${moeda.format(Number(preco) / fator)} cada`;
+        };
+
+        form.addEventListener("input", atualizar);
+        atualizar();
+    })();
+</script>
+{% endblock %}
