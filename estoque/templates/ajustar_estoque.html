@@ -1,0 +1,27 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Ajustar estoque{% endblock %}
+
+{% block body_content %}
+<div class="mb-5">
+    <h1 class="text-2xl font-bold">Ajustar estoque</h1>
+    <p class="text-sm opacity-70">{{ produto.nome }}. Unidades retiradas saem dos lotes mais antigos.</p>
+</div>
+
+<form method="post" class="card max-w-xl bg-base-100 shadow-sm">
+    <div class="card-body">
+        {% csrf_token %}
+        {% for erro in form.non_field_errors %}
+            <div class="alert alert-error mb-2" role="alert">{{ erro }}</div>
+        {% endfor %}
+        {% include 'setup/campo.html' with campo=form.operacao %}
+        {% include 'setup/campo.html' with campo=form.quantidade %}
+        {% include 'setup/campo.html' with campo=form.motivo %}
+        {% include 'setup/campo.html' with campo=form.observacao %}
+        <div class="flex flex-wrap gap-3">
+            <button class="btn btn-primary" type="submit">Registrar ajuste</button>
+            <a class="btn btn-ghost" href="{% url 'estoque:estoque_produto' produto.pk %}">Voltar</a>
+        </div>
+    </div>
+</form>
+{% endblock %}

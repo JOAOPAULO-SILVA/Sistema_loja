@@ -1,0 +1,31 @@
+<div class="overflow-x-auto rounded-box bg-base-100 shadow-sm">
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Data</th>
+                {% if mostrar_produto %}<th scope="col">Produto</th>{% endif %}
+                <th scope="col">Tipo</th>
+                <th scope="col" class="text-right">Quantidade</th>
+                <th scope="col">Detalhes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for movimentacao in pagina %}
+                <tr>
+                    <td class="whitespace-nowrap">{{ movimentacao.data|date:"d/m/Y H:i" }}</td>
+                    {% if mostrar_produto %}
+                        <td><a class="link" href="{% url 'estoque:estoque_produto' movimentacao.lote.produto_id %}">{{ movimentacao.lote.produto.nome }}</a></td>
+                    {% endif %}
+                    <td>{{ movimentacao.get_tipo_display }}</td>
+                    <td class="text-right font-semibold {% if movimentacao.quantidade > 0 %}text-success{% else %}text-error{% endif %}">{% if movimentacao.quantidade > 0 %}+{% endif %}{{ movimentacao.quantidade }}</td>
+                    <td class="text-sm opacity-70">{{ movimentacao.get_motivo_display }}{% if movimentacao.motivo and movimentacao.observacao %} · {% endif %}{{ movimentacao.observacao }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5" class="py-8 text-center opacity-70">Nenhuma movimentação registrada.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% include 'paginacao.html' %}

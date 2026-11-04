@@ -1,0 +1,16 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Movimentações{% endblock %}
+
+{% block body_content %}
+<h1 class="mb-5 text-2xl font-bold">Movimentações</h1>
+
+<nav class="mb-5 flex flex-wrap gap-2" aria-label="Filtrar por tipo">
+    <a class="btn btn-sm{% if not tipo %} btn-neutral{% endif %}" href="{% url 'estoque:listar_movimentacoes' %}">Todas</a>
+    {% for valor, nome in tipos %}
+        <a class="btn btn-sm{% if tipo == valor %} btn-neutral{% endif %}" href="?tipo={{ valor }}">{{ nome }}</a>
+    {% endfor %}
+</nav>
+
+{% include 'movimentacoes_tabela.html' with mostrar_produto=True %}
+{% endblock %}

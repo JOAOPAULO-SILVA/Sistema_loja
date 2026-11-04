@@ -31,8 +31,10 @@
                 <tr>
                     <th scope="col">Nome</th>
                     <th scope="col">Categoria</th>
-                    <th scope="col">Código de barras</th>
-                    <th scope="col" class="text-right">Preço de venda</th>
+                    <th scope="col" class="text-right">Estoque</th>
+                    <th scope="col" class="text-right">Custo</th>
+                    <th scope="col" class="text-right">Venda</th>
+                    <th scope="col" class="text-right">Lucro por unidade</th>
                     <th scope="col" class="text-right">Ações</th>
                 </tr>
             </thead>
@@ -44,8 +46,10 @@
                             {% if not produto.ativo %}<span class="badge badge-ghost badge-sm ml-1">Inativo</span>{% endif %}
                         </th>
                         <td>{{ produto.categoria }}</td>
-                        <td>{{ produto.codigo_barras_unidade|default:"—" }}</td>
+                        <td class="text-right">{{ produto.saldo }}</td>
+                        <td class="text-right">{% if produto.ultimo_custo is not None %}R$ {{ produto.ultimo_custo|floatformat:2 }}{% else %}—{% endif %}</td>
                         <td class="text-right">R$ {{ produto.preco_venda_base }}</td>
+                        <td class="text-right">{% if produto.lucro_unitario is not None %}R$ {{ produto.lucro_unitario|floatformat:2 }}{% else %}—{% endif %}</td>
                         <td>{% include 'produto_acoes.html' %}</td>
                     </tr>
                 {% endfor %}
@@ -62,7 +66,7 @@
                         <span class="whitespace-nowrap font-semibold">R$ {{ produto.preco_venda_base }}</span>
                     </div>
                     <p class="text-sm opacity-70">
-                        {{ produto.categoria }}{% if produto.codigo_barras_unidade %} · {{ produto.codigo_barras_unidade }}{% endif %}{% if not produto.ativo %} · Inativo{% endif %}
+                        {{ produto.categoria }} · Estoque: {{ produto.saldo }}{% if produto.lucro_unitario is not None %} · Lucro: R$ {{ produto.lucro_unitario|floatformat:2 }}{% endif %}{% if not produto.ativo %} · Inativo{% endif %}
                     </p>
                     <div class="mt-2">{% include 'produto_acoes.html' %}</div>
                 </div>
@@ -70,17 +74,7 @@
         {% endfor %}
     </ul>
 
-    {% if pagina.paginator.num_pages > 1 %}
-        <nav class="mt-5 flex items-center justify-center gap-3" aria-label="Paginação">
-            {% if pagina.has_previous %}
-                <a class="btn btn-sm" href="?{% if parametros %}{{ parametros }}&{% endif %}page={{ pagina.previous_page_number }}">Anterior</a>
-            {% endif %}
-            <span class="text-sm">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
-            {% if pagina.has_next %}
-                <a class="btn btn-sm" href="?{% if parametros %}{{ parametros }}&{% endif %}page={{ pagina.next_page_number }}">Próxima</a>
-            {% endif %}
-        </nav>
-    {% endif %}
+    {% include 'paginacao.html' %}
 {% else %}
     <div class="rounded-box bg-base-100 p-8 text-center shadow-sm">
         <p class="opacity-70">Nenhum produto encontrado.</p>

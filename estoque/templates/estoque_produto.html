@@ -1,0 +1,62 @@
+{% extends 'setup/base.html' %}
+
+{% block title %}Estoque de {{ produto.nome }}{% endblock %}
+
+{% block body_content %}
+<div class="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div>
+        <h1 class="text-2xl font-bold">{{ produto.nome }}</h1>
+        <p class="text-sm opacity-70">{{ produto.categoria }} · R$ {{ produto.preco_venda_base }}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a class="btn btn-primary" href="{% url 'estoque:registrar_entrada' produto.pk %}">Registrar entrada</a>
+        <a class="btn" href="{% url 'estoque:ajustar_estoque' produto.pk %}">Ajustar estoque</a>
+    </div>
+</div>
+
+<section class="mb-6 grid items-start gap-5 md:grid-cols-[14rem_1fr]">
+    <div class="rounded-box bg-base-100 p-5 shadow-sm">
+        <p class="text-sm opacity-70">Saldo atual</p>
+        <p class="text-3xl font-bold">{{ saldo }}</p>
+        <p class="text-sm opacity-70">unidade{{ saldo|pluralize }}</p>
+    </div>
+
+    <div class="overflow-x-auto rounded-box bg-base-100 shadow-sm">
+        <table class="table">
+            <caption class="sr-only">Lotes com saldo, do mais antigo ao mais novo</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Entrada</th>
+                    <th scope="col" class="text-right">Custo por unidade</th>
+                    <th scope="col" class="text-right">Disponível</th>
+                    <th scope="col"><span class="sr-only">Ações</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lote in lotes %}
+                    <tr>
+                        <td class="whitespace-nowrap">{{ lote.data_entrada|date:"d/m/Y" }}</td>
+                        <td class="text-right">R$ {{ lote.preco_custo_unitario|floatformat:2 }}</td>
+                        <td class="text-right">{{ lote.quantidade_disponivel }} de {{ lote.quantidade_inicial }}</td>
+                        <td class="text-right">
+                            {% if lote.total_movimentacoes == 1 %}
+                                <form method="post" action="{% url 'estoque:excluir_entrada' lote.pk %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-ghost btn-sm" type="submit">Excluir</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4" class="py-8 text-center opacity-70">Sem estoque. Registre uma entrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<h2 class="mb-3 text-lg font-semibold">Histórico</h2>
+{% include 'movimentacoes_tabela.html' %}
+{% endblock %}

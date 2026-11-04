@@ -6,6 +6,7 @@
             <ul class="menu menu-horizontal gap-1 p-0">
                 <li><a href="{% url 'estoque:listar_produtos' %}"{% if rota == 'listar_produtos' %} class="menu-active" aria-current="page"{% endif %}>Produtos</a></li>
                 <li><a href="{% url 'estoque:listar_categorias' %}"{% if rota == 'listar_categorias' %} class="menu-active" aria-current="page"{% endif %}>Categorias</a></li>
+                <li><a href="{% url 'estoque:listar_movimentacoes' %}"{% if rota == 'listar_movimentacoes' %} class="menu-active" aria-current="page"{% endif %}>Movimentações</a></li>
             </ul>
         </nav>
         <form method="post" action="{% url 'logout' %}" class="ml-auto flex items-center gap-2">
