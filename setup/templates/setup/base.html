@@ -1,31 +1,21 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Meu Estoque{% endblock %}</title>
-    <link rel="shortcut icon" href="https://cdn.jsdelivr.net/gh/zuramai/mazer@docs/demo/assets/compiled/svg/favicon.svg" type="image/x-icon">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/zuramai/mazer@docs/demo/assets/compiled/css/app.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/zuramai/mazer@docs/demo/assets/compiled/css/app-dark.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/zuramai/mazer@docs/demo/assets/compiled/css/iconly.css">
+    <link rel="stylesheet" href="{% static 'setup/app.css' %}">
 </head>
-<body>
-    <script src="https://cdn.jsdelivr.net/gh/zuramai/mazer@docs/demo/assets/static/js/initTheme.js"></script>
-    <div id="app">
-        <div id="main" class="layout-horizontal">
-            <header class="mb-5">
-                {% include 'setup/navbar.html' %}
-            </header>
-            <main class="container page-content">
-                {% block body_content %}
-                {% endblock %}
-            </main>
-            <footer class="mt-5 mb-4 text-center text-muted">
-                <small>Meu Estoque</small>
-            </footer>
-        </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/gh/zuramai/mazer@docs/demo/assets/static/js/pages/horizontal-layout.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/zuramai/mazer@docs/demo/assets/compiled/js/app.js"></script>
+<body class="min-h-screen bg-base-200 text-base-content">
+    {% include 'setup/navbar.html' %}
+    <main class="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+        {% for message in messages %}
+            <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %} mb-4" role="alert">
+                {{ message }}
+            </div>
+        {% endfor %}
+        {% block body_content %}
+        {% endblock %}
+    </main>
 </body>
 </html>

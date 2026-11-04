@@ -1,29 +1,89 @@
 {% extends 'setup/base.html' %}
-{% load static %}
+
+{% block title %}Produtos{% endblock %}
 
 {% block body_content %}
-<h1>Lista de Itens</h1>
-<table class="table">
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-bold">Produtos</h1>
+    <a class="btn btn-primary" href="{% url 'estoque:cadastrar_produto' %}">Novo produto</a>
+</div>
 
-    <thead>
-        <tr>
-            <th scope="col">Nome</th>
-            <th scope="col">Quantidade</th>
-            <th scope="col">Valor De compra</th>
-            <th scope="col">Valor De venda</th>
-            <th scope="col">Lucro Por Unidade</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <th scope="row">hamburguer</th>
-            <td>8</td>
-            <td>23,50</td>
-            <td>28,00</td>
-            <td>4,50</td>
-        </tr>
-    </tbody>
-    <tfoot>
-    </tfoot>
-</table>
+<form method="get" class="mb-5 grid gap-3 rounded-box bg-base-100 p-4 shadow-sm sm:grid-cols-[1fr_14rem_10rem_auto]">
+    <div>
+        <label class="sr-only" for="{{ filtro.busca.id_for_label }}">Buscar</label>
+        {{ filtro.busca }}
+    </div>
+    <div>
+        <label class="sr-only" for="{{ filtro.categoria.id_for_label }}">Categoria</label>
+        {{ filtro.categoria }}
+    </div>
+    <div>
+        <label class="sr-only" for="{{ filtro.status.id_for_label }}">Status</label>
+        {{ filtro.status }}
+    </div>
+    <button class="btn btn-neutral" type="submit">Filtrar</button>
+</form>
+
+{% if pagina.object_list %}
+    <div class="hidden overflow-x-auto rounded-box bg-base-100 shadow-sm md:block">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Nome</th>
+                    <th scope="col">Categoria</th>
+                    <th scope="col">Código de barras</th>
+                    <th scope="col" class="text-right">Preço de venda</th>
+                    <th scope="col" class="text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for produto in pagina %}
+                    <tr{% if not produto.ativo %} class="opacity-60"{% endif %}>
+                        <th scope="row">
+                            {{ produto.nome }}
+                            {% if not produto.ativo %}<span class="badge badge-ghost badge-sm ml-1">Inativo</span>{% endif %}
+                        </th>
+                        <td>{{ produto.categoria }}</td>
+                        <td>{{ produto.codigo_barras_unidade|default:"—" }}</td>
+                        <td class="text-right">R$ {{ produto.preco_venda_base }}</td>
+                        <td>{% include 'produto_acoes.html' %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <ul class="grid gap-3 md:hidden">
+        {% for produto in pagina %}
+            <li class="card bg-base-100 shadow-sm{% if not produto.ativo %} opacity-60{% endif %}">
+                <div class="card-body gap-1 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <h2 class="font-semibold">{{ produto.nome }}</h2>
+                        <span class="whitespace-nowrap font-semibold">R$ {{ produto.preco_venda_base }}</span>
+                    </div>
+                    <p class="text-sm opacity-70">
+                        {{ produto.categoria }}{% if produto.codigo_barras_unidade %} · {{ produto.codigo_barras_unidade }}{% endif %}{% if not produto.ativo %} · Inativo{% endif %}
+                    </p>
+                    <div class="mt-2">{% include 'produto_acoes.html' %}</div>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% if pagina.paginator.num_pages > 1 %}
+        <nav class="mt-5 flex items-center justify-center gap-3" aria-label="Paginação">
+            {% if pagina.has_previous %}
+                <a class="btn btn-sm" href="?{% if parametros %}{{ parametros }}&{% endif %}page={{ pagina.previous_page_number }}">Anterior</a>
+            {% endif %}
+            <span class="text-sm">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+            {% if pagina.has_next %}
+                <a class="btn btn-sm" href="?{% if parametros %}{{ parametros }}&{% endif %}page={{ pagina.next_page_number }}">Próxima</a>
+            {% endif %}
+        </nav>
+    {% endif %}
+{% else %}
+    <div class="rounded-box bg-base-100 p-8 text-center shadow-sm">
+        <p class="opacity-70">Nenhum produto encontrado.</p>
+    </div>
+{% endif %}
 {% endblock %}

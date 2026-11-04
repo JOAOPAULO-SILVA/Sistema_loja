@@ -1,0 +1,7 @@
+<div class="mb-4">
+    <label class="label mb-1 block text-sm font-medium" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+    {{ campo }}
+    {% for erro in campo.errors %}
+        <p class="mt-1 text-sm text-error">{{ erro }}</p>
+    {% endfor %}
+</div>

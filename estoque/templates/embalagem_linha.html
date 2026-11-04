@@ -1,0 +1,13 @@
+<div class="mb-3 grid items-start gap-3 md:grid-cols-[1fr_1fr_1.4fr_auto]" data-embalagem-row>
+    {% for hidden in embalagem.hidden_fields %}{{ hidden }}{% endfor %}
+    {% for erro in embalagem.non_field_errors %}
+        <p class="text-sm text-error md:col-span-4">{{ erro }}</p>
+    {% endfor %}
+    {% include 'setup/campo.html' with campo=embalagem.tipo %}
+    {% include 'setup/campo.html' with campo=embalagem.fator_conversao %}
+    {% include 'setup/campo.html' with campo=embalagem.codigo_barras %}
+    <div class="md:pt-7">
+        {{ embalagem.DELETE.as_hidden }}
+        <button class="btn btn-outline btn-error" type="button" data-remover-embalagem>Remover</button>
+    </div>
+</div>
